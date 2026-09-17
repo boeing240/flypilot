@@ -66,5 +66,12 @@
     "note": "from-scratch population run (population=8, train=4000, seed=1): best 100% finish, 0 crashes, avg_time=11.29s (seed=804423) -- beats prior best of 12.18s. Uniform TD(0) for both streams badly broke steering (100% crash across all genomes); splitting by compartment fixed it and improved on the old scalar-only baseline result.",
     "kept_as_best": true,
     "avg_time": 11.29
+  },
+  {
+    "milestone": "structural KC compartmentalization (separate KC populations per dopamine compartment, hard-masked connections)",
+    "note": "confirmed the FINDINGS.md hypothesis about slip-signal leakage into steering via shared random KC wiring. Robustness scenario test: cold_greasy_track and worst_case went from 0/150 finish + 150/150 crash to 149-150/150 finish + 0 crashes, matching baseline reliability. Trade-off: nominal-scenario speed regressed to 15.04s avg (vs 11.29s TD-only best) -- likely due to longitudinal compartment losing KC capacity (only 450/600 by default via lat_kc_fraction=0.25).",
+    "kept_as_best": true,
+    "avg_time_nominal": 15.04,
+    "traction_loss_scenarios_fixed": true
   }
 ]

@@ -169,3 +169,58 @@ where the problem actually was (rather than uniformly) is what made it work.
   whether the same finetune-scale + checkpointing approach from evolve.py's
   `--continue-from` mode does better at improving on an 11.29s individual
   than it did on the old 12.18s one.
+
+## 2026-09-18 — Structural KC compartmentalization fixes the traction-loss failure
+
+**Tried:** the suspected cause from the earlier robustness-test section --
+KC wiring was a random projection over the *whole* PN vector, so nothing
+stopped a KC that happens to fire on out-of-distribution wheel_slip from
+also, by chance, feeding steer_pos/steer_neg. Fixed it structurally rather
+than just hoping training never reinforces that connection: split the KC
+population itself into two disjoint groups (`brain.py`'s
+`_pn_compartment_indices` / `lat_kc_fraction`), one wired (via its claws)
+from only the two curb-distance PN channels and able to drive only the
+steer pools, the other wired from every other channel (rpm, throttle,
+speed, wheel_slip, gear, progress, green-onset) and able to drive only
+go/lift/shift. `connection_mask` zeroes out cross-compartment `W` entries
+at init *and* keeps them masked during plasticity updates in
+`apply_dopamine`, so a lateral KC physically cannot receive a slip signal,
+and a longitudinal KC physically cannot drive steering, regardless of what
+training does. This is the real anatomical mirror of "different DAN
+compartments" that the dopamine split alone wasn't -- separate populations
+per compartment, not just separate reward broadcast to a fully shared one.
+
+**Result:** re-ran the same robustness test as before (no retraining,
+five scenarios, 150 episodes each) on a freshly population-selected brain
+(population 8, 4000 episodes, same seed):
+
+| scenario | fly finish | fly crash | baseline finish | baseline crash |
+|---|---|---|---|---|
+| nominal | 150/150 | 0 | 150/150 | 0 |
+| hot_engine | 150/150 | 0 | 150/150 | 0 |
+| cold_greasy_track | **149/150** | **0** | 150/150 | 0 |
+| patchy_grip | **150/150** | **0** | 150/150 | 0 |
+| worst_case | **150/150** | **0** | 150/150 | 0 |
+
+Previously: 0/150 finish and 150/150 crash on both `cold_greasy_track` and
+`worst_case`, 44/150 finish and 106 crashes on `patchy_grip`. The fly now
+matches the baseline's reliability on every scenario, including ones it
+never trained on -- confirming the KC-overlap hypothesis was the real cause,
+not a guess.
+
+**Trade-off:** the *population as a whole* got much more reliable (0
+crashes across all 8 genomes in training, vs. several genomes crashing
+100% of the time before) but slower: best avg_time on nominal was 15.04s,
+worse than the 11.29s TD-baseline-only result from the previous entry.
+Likely cause: the longitudinal compartment only gets `n_kc - n_kc_lat`
+(450 of 600 by default) KCs now, instead of the full shared population, so
+there's less representational capacity/flexibility for throttle/shift
+specifically. Worth tuning `lat_kc_fraction` and/or combining this with the
+TD baseline's individual results rather than picking one population run.
+
+**Next candidates (not yet tried):**
+- Tune `lat_kc_fraction` (currently 0.25) -- the lateral task (2 raw
+  features) may not need as much of the KC budget as it's currently given,
+  and reclaiming KCs for the longitudinal compartment might recover the
+  11.29s-level speed without reintroducing the cross-talk.
+- A genuine multi-tick eligibility trace (still untried, see above).

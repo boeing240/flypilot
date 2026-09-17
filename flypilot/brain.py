@@ -25,12 +25,33 @@ from __future__ import annotations
 
 import numpy as np
 
+from .sense import FEATURE_NAMES, N_FEATURES
+
 POOLS = ("go", "lift", "steer_pos", "steer_neg", "shift")
 # which dopamine stream (see learning.py) gates each pool -- mirrors the fly MB's
 # compartmentalized DAN input, where different compartments get reward info about
 # different things rather than one global broadcast. Without this split, steering's
 # reward variance drowns the throttle signal and vice versa (see brain module docstring).
 POOL_GROUP = np.array([0, 0, 1, 1, 0])  # 0 = longitudinal (go/lift/shift), 1 = lateral (steer)
+
+# Every sensory feature except the two curb-distance ones is longitudinal --
+# only these two are actually about lane position.
+LAT_FEATURES = {"curb_error", "curb_min"}
+
+
+def _pn_compartment_indices() -> tuple[np.ndarray, np.ndarray]:
+    """PN indices (ON/OFF-split, see sense.py) split into longitudinal vs
+    lateral groups by which sensory feature they encode. The green-onset
+    channel (index N_FEATURES*2) is launch/throttle-relevant, so it's
+    longitudinal.
+    """
+    lon, lat = [], []
+    for i, name in enumerate(FEATURE_NAMES):
+        group = lat if name in LAT_FEATURES else lon
+        group.append(i)                 # ON channel
+        group.append(N_FEATURES + i)    # OFF channel
+    lon.append(N_FEATURES * 2)          # green-onset transient
+    return np.array(sorted(lon)), np.array(sorted(lat))
 
 
 class FlyBrain:
@@ -43,14 +64,42 @@ class FlyBrain:
         eta: float = 0.02,
         noise_sigma: float = 0.5,
         seed: int = 0,
+        lat_kc_fraction: float = 0.25,
     ):
         self.rng = np.random.default_rng(seed)
         self.n_pn = n_pn
         self.n_kc = n_kc
         self.sparsity = sparsity
-        self.claw_idx = self.rng.integers(0, n_pn, size=(n_kc, n_claws))
+
+        # Structural compartmentalization: split the KC population itself
+        # into two disjoint groups, each wired (via its claws) from only one
+        # compartment's PN channels, and each only ever able to drive that
+        # compartment's pools (enforced below via connection_mask). Without
+        # this, a KC is wired from the *whole* PN vector by chance, so an
+        # out-of-distribution channel (e.g. wheel_slip during traction loss)
+        # can activate KCs that happen to also feed steer_pos/steer_neg,
+        # producing steering commands unrelated to actual curb distance --
+        # the suspected cause of the traction-loss generalization failure in
+        # FINDINGS.md. A KC that never receives lateral PN channels as input
+        # simply cannot do this, by construction rather than by hoping
+        # training never reinforces the spurious connection.
+        lon_pn_idx, lat_pn_idx = _pn_compartment_indices()
+        n_kc_lat = max(1, round(n_kc * lat_kc_fraction))
+        n_kc_lon = n_kc - n_kc_lat
+        self.kc_group = np.concatenate([np.zeros(n_kc_lon, dtype=int), np.ones(n_kc_lat, dtype=int)])
+
+        claw_idx = np.empty((n_kc, n_claws), dtype=int)
+        claw_idx[:n_kc_lon] = self.rng.choice(lon_pn_idx, size=(n_kc_lon, n_claws))
+        claw_idx[n_kc_lon:] = self.rng.choice(lat_pn_idx, size=(n_kc_lat, n_claws))
+        self.claw_idx = claw_idx
         self.claw_w = self.rng.uniform(0.5, 1.5, size=(n_kc, n_claws))
+
         self.W = self.rng.normal(0.0, 0.05, size=(len(POOLS), n_kc))
+        pool_is_lat = (POOL_GROUP == 1)[:, None]
+        kc_is_lat = (self.kc_group == 1)[None, :]
+        self.connection_mask = (pool_is_lat == kc_is_lat).astype(np.float64)
+        self.W *= self.connection_mask
+
         self.eligibility = np.zeros_like(self.W)
         self.eta = eta
         self.noise_sigma = noise_sigma
@@ -96,6 +145,10 @@ class FlyBrain:
 
     def apply_dopamine(self, dopamine_lon: float, dopamine_lat: float):
         dopamine = np.where(POOL_GROUP == 0, dopamine_lon, dopamine_lat)
-        self.W += self.eta * dopamine[:, None] * self.eligibility
+        # eligibility is a full outer product over *all* KCs regardless of
+        # compartment, so it must be masked here too -- otherwise plasticity
+        # would quietly grow the very cross-compartment connections the
+        # structural wiring split was meant to prevent from existing.
+        self.W += self.eta * dopamine[:, None] * self.eligibility * self.connection_mask
         np.clip(self.W, -self.w_max, self.w_max, out=self.W)
         self.W *= 0.999  # slow decay keeps weights bounded without hard rescaling

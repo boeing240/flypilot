@@ -5,8 +5,8 @@
       "finished": 150,
       "crashes": 0,
       "timeouts": 0,
-      "avg_time": 10.019999999999875,
-      "best_time": 10.019999999999875
+      "avg_time": 15.036133333333101,
+      "best_time": 14.839999999999772
     },
     "baseline": {
       "n": 150,
@@ -23,8 +23,8 @@
       "finished": 150,
       "crashes": 0,
       "timeouts": 0,
-      "avg_time": 10.159999999999872,
-      "best_time": 10.159999999999872
+      "avg_time": 14.924133333333105,
+      "best_time": 14.859999999999772
     },
     "baseline": {
       "n": 150,
@@ -38,11 +38,11 @@
   "cold_greasy_track": {
     "fly": {
       "n": 150,
-      "finished": 0,
-      "crashes": 150,
-      "timeouts": 0,
-      "avg_time": null,
-      "best_time": null
+      "finished": 149,
+      "crashes": 0,
+      "timeouts": 1,
+      "avg_time": 18.36872483221446,
+      "best_time": 15.979999999999748
     },
     "baseline": {
       "n": 150,
@@ -56,37 +56,37 @@
   "patchy_grip": {
     "fly": {
       "n": 150,
-      "finished": 44,
-      "crashes": 106,
+      "finished": 150,
+      "crashes": 0,
       "timeouts": 0,
-      "avg_time": 14.650454545454322,
-      "best_time": 14.559999999999778
+      "avg_time": 14.99199999999977,
+      "best_time": 14.659999999999776
     },
     "baseline": {
       "n": 150,
       "finished": 150,
       "crashes": 0,
       "timeouts": 0,
-      "avg_time": 10.471066666666532,
-      "best_time": 10.25999999999987
+      "avg_time": 10.4633333333332,
+      "best_time": 10.179999999999872
     }
   },
   "worst_case": {
     "fly": {
       "n": 150,
-      "finished": 0,
-      "crashes": 150,
+      "finished": 150,
+      "crashes": 0,
       "timeouts": 0,
-      "avg_time": null,
-      "best_time": null
+      "avg_time": 17.196399999999723,
+      "best_time": 15.939999999999749
     },
     "baseline": {
       "n": 150,
       "finished": 150,
       "crashes": 0,
       "timeouts": 0,
-      "avg_time": 12.75053333333315,
-      "best_time": 12.519999999999822
+      "avg_time": 12.73693333333315,
+      "best_time": 12.499999999999822
     }
   }
 }
