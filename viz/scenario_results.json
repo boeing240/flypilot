@@ -1,0 +1,92 @@
+{
+  "nominal": {
+    "fly": {
+      "n": 150,
+      "finished": 150,
+      "crashes": 0,
+      "timeouts": 0,
+      "avg_time": 10.019999999999875,
+      "best_time": 10.019999999999875
+    },
+    "baseline": {
+      "n": 150,
+      "finished": 150,
+      "crashes": 0,
+      "timeouts": 0,
+      "avg_time": 10.139999999999873,
+      "best_time": 10.139999999999873
+    }
+  },
+  "hot_engine": {
+    "fly": {
+      "n": 150,
+      "finished": 150,
+      "crashes": 0,
+      "timeouts": 0,
+      "avg_time": 10.159999999999872,
+      "best_time": 10.159999999999872
+    },
+    "baseline": {
+      "n": 150,
+      "finished": 150,
+      "crashes": 0,
+      "timeouts": 0,
+      "avg_time": 10.019999999999875,
+      "best_time": 10.019999999999875
+    }
+  },
+  "cold_greasy_track": {
+    "fly": {
+      "n": 150,
+      "finished": 0,
+      "crashes": 150,
+      "timeouts": 0,
+      "avg_time": null,
+      "best_time": null
+    },
+    "baseline": {
+      "n": 150,
+      "finished": 150,
+      "crashes": 0,
+      "timeouts": 0,
+      "avg_time": 12.739999999999817,
+      "best_time": 12.739999999999817
+    }
+  },
+  "patchy_grip": {
+    "fly": {
+      "n": 150,
+      "finished": 44,
+      "crashes": 106,
+      "timeouts": 0,
+      "avg_time": 14.650454545454322,
+      "best_time": 14.559999999999778
+    },
+    "baseline": {
+      "n": 150,
+      "finished": 150,
+      "crashes": 0,
+      "timeouts": 0,
+      "avg_time": 10.471066666666532,
+      "best_time": 10.25999999999987
+    }
+  },
+  "worst_case": {
+    "fly": {
+      "n": 150,
+      "finished": 0,
+      "crashes": 150,
+      "timeouts": 0,
+      "avg_time": null,
+      "best_time": null
+    },
+    "baseline": {
+      "n": 150,
+      "finished": 150,
+      "crashes": 0,
+      "timeouts": 0,
+      "avg_time": 12.75053333333315,
+      "best_time": 12.519999999999822
+    }
+  }
+}

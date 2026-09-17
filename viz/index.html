@@ -1,0 +1,567 @@
+<title>Fly Pilot Drag Strip</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0c0f; --surface:#14181d; --surface-2:#1b2128; --raised:#20272f;
+    --line:#2a323c; --text:#e9edf2; --muted:#8994a3; --muted-2:#5c6673;
+    --amber:#f5a524; --green:#38d97a; --red:#ef4a5f; --cyan:#4fd1e8; --violet:#a48cf2;
+    --font-display:'Barlow Condensed',system-ui,sans-serif;
+    --font-mono:'JetBrains Mono',ui-monospace,monospace;
+    --font-body:'Inter',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--bg); color:var(--text); font-family:var(--font-body);
+    padding-inline:16px; padding-block:20px 40px; max-width:1180px; margin:0 auto;
+  }
+  h1,h2,h3{font-family:var(--font-display); font-weight:700; margin:0; text-wrap:balance}
+  .eyebrow{
+    font-family:var(--font-mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--muted-2);
+  }
+  header{display:flex; flex-wrap:wrap; align-items:baseline; gap:10px 18px; margin-bottom:22px}
+  header h1{font-size:34px; letter-spacing:.01em}
+  header p{margin:0; color:var(--muted); font-size:14px; max-width:60ch}
+
+  .scenario-row{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px}
+  .scenario-btn{
+    font-family:var(--font-mono); font-size:12.5px; letter-spacing:.02em;
+    background:var(--surface); border:1px solid var(--line); color:var(--muted);
+    padding:9px 14px; border-radius:7px; cursor:pointer; transition:.15s;
+  }
+  .scenario-btn:hover{color:var(--text); border-color:#3a4552}
+  .scenario-btn.active{background:var(--raised); color:var(--cyan); border-color:var(--cyan)}
+  .scenario-desc{color:var(--muted); font-size:13px; margin:6px 0 22px; min-height:18px}
+  .scenario-desc b{color:var(--text); font-weight:600}
+
+  .compare-card{
+    background:var(--surface); border:1px solid var(--line); border-radius:10px;
+    padding:14px 16px 6px; margin-bottom:22px;
+  }
+  .compare-head{display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:10px}
+  .compare-card h3{
+    font-family:var(--font-body); font-size:13.5px; font-weight:600; color:var(--muted);
+    margin:0;
+  }
+  .compare-hint{font-weight:400; color:var(--muted-2); font-size:12px}
+  .compare-actions{display:flex; gap:8px}
+  .ghost-btn{
+    font-family:var(--font-mono); font-size:11.5px; letter-spacing:.03em;
+    background:transparent; border:1px solid var(--line); color:var(--muted);
+    padding:6px 12px; border-radius:7px; cursor:pointer; transition:.15s;
+  }
+  .ghost-btn:hover{color:var(--text); border-color:#3a4552}
+  .compare-empty{color:var(--muted); font-size:12.5px; padding:16px 2px 6px}
+  .compare-scroll{overflow-x:auto}
+  table.compare-table{border-collapse:collapse; width:100%; min-width:640px}
+  .compare-table th{
+    font-family:var(--font-mono); font-size:10.5px; letter-spacing:.05em; text-transform:uppercase;
+    color:var(--muted-2); text-align:left; padding:6px 10px; border-bottom:1px solid var(--line);
+    font-weight:500;
+  }
+  .compare-table th.grp-fly{color:var(--cyan)}
+  .compare-table th.grp-baseline{color:var(--violet)}
+  .compare-table td{
+    padding:9px 10px; font-family:var(--font-mono); font-size:13px; font-variant-numeric:tabular-nums;
+    border-bottom:1px solid var(--line); white-space:nowrap;
+  }
+  .compare-table td.scen-label{font-family:var(--font-body); font-weight:600; white-space:normal}
+  .compare-table tr{cursor:pointer}
+  .compare-table tbody tr:hover{background:var(--surface-2)}
+  .compare-table tbody tr.active{background:var(--raised)}
+  .compare-table tbody tr.active td.scen-label{color:var(--cyan)}
+  .pill{padding:2px 7px; border-radius:20px; font-size:11.5px}
+  .pill.good{color:var(--green)}
+  .pill.bad{color:var(--red); font-weight:700}
+  .pill.mid{color:var(--amber)}
+
+  .stat-grid{
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:10px;
+    margin-bottom:26px;
+  }
+  .stat-card{
+    background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:14px 16px;
+  }
+  .stat-card .who{
+    font-family:var(--font-mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+  }
+  .stat-card.fly .who{color:var(--cyan)}
+  .stat-card.baseline .who{color:var(--violet)}
+  .stat-card .figs{display:flex; gap:18px; margin-top:8px}
+  .fig .n{font-family:var(--font-mono); font-size:22px; font-variant-numeric:tabular-nums; font-weight:700}
+  .fig .l{font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em}
+  .fig .n.bad{color:var(--red)}
+  .fig .n.good{color:var(--green)}
+
+  .transport{
+    display:flex; align-items:center; gap:12px; background:var(--surface); border:1px solid var(--line);
+    border-radius:10px; padding:10px 14px; margin-bottom:18px; flex-wrap:wrap;
+  }
+  .transport button{
+    background:var(--raised); border:1px solid var(--line); color:var(--text); width:34px; height:34px;
+    border-radius:8px; cursor:pointer; font-size:14px; display:flex; align-items:center; justify-content:center;
+  }
+  .transport button:hover{border-color:var(--cyan)}
+  .transport input[type=range]{flex:1; accent-color:var(--cyan); min-width:120px}
+  .clock{font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:14px; color:var(--text); min-width:64px}
+  .speed-select{display:flex; gap:4px}
+  .speed-select button{
+    width:auto; padding:0 9px; font-family:var(--font-mono); font-size:11.5px; color:var(--muted);
+  }
+  .speed-select button.active{color:var(--cyan); border-color:var(--cyan)}
+
+  .lanes{display:flex; flex-direction:column; gap:14px; margin-bottom:24px}
+  .lane{
+    background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:14px 16px 16px;
+  }
+  .lane-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px}
+  .lane-title{
+    font-family:var(--font-display); font-size:19px; font-weight:700; display:flex; align-items:center; gap:9px;
+  }
+  .dot{width:9px; height:9px; border-radius:50%; display:inline-block}
+  .lane.fly .dot{background:var(--cyan)}
+  .lane.baseline .dot{background:var(--violet)}
+  .lane-phase{
+    font-family:var(--font-mono); font-size:11px; padding:3px 9px; border-radius:20px; letter-spacing:.04em;
+    text-transform:uppercase; border:1px solid var(--line); color:var(--muted);
+  }
+  .lane-phase.crash{color:var(--red); border-color:var(--red)}
+  .lane-phase.finished{color:var(--green); border-color:var(--green)}
+  .lane-phase.green,.lane-phase.racing{color:var(--amber); border-color:var(--amber)}
+  .lane-time{
+    font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:15px; color:var(--muted);
+  }
+  .lane-time.final{color:var(--text); font-weight:700}
+
+  .lane-body{display:grid; grid-template-columns:64px 1fr; gap:12px; align-items:center}
+  .tree{display:flex; flex-direction:column; gap:3px; align-items:center}
+  .tree .bulb{width:16px; height:12px; border-radius:3px; background:#232a32; border:1px solid var(--line)}
+  .tree .bulb.amber.on{background:var(--amber); box-shadow:0 0 10px 1px #f5a52480}
+  .tree .bulb.green.on{background:var(--green); box-shadow:0 0 10px 1px #38d97a80}
+  canvas.track{width:100%; height:96px; display:block; border-radius:8px; background:var(--surface-2)}
+
+  .telemetry-row{display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:12px}
+  .tele{background:var(--surface-2); border-radius:8px; padding:8px 10px}
+  .tele .l{font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em}
+  .tele .v{font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:18px; margin-top:2px}
+  .bar-track{height:5px; background:#0d1013; border-radius:3px; margin-top:6px; overflow:hidden}
+  .bar-fill{height:100%; border-radius:3px}
+  .lane.fly .bar-fill{background:var(--cyan)}
+  .lane.baseline .bar-fill{background:var(--violet)}
+  .bar-fill.rpm-hot{background:var(--red)}
+
+  .charts{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+  .chart-card{background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:12px 14px}
+  .chart-card h3{font-size:14px; font-family:var(--font-body); font-weight:600; margin-bottom:6px; color:var(--muted)}
+  svg.chart{width:100%; height:110px; display:block}
+
+  footer{margin-top:30px; color:var(--muted-2); font-size:12px; font-family:var(--font-mono)}
+
+  @media (max-width:720px){
+    .lane-body{grid-template-columns:1fr}
+    .tree{flex-direction:row}
+    .charts{grid-template-columns:1fr}
+    .telemetry-row{grid-template-columns:repeat(2,1fr)}
+  }
+</style>
+
+<header>
+  <h1>🪰 Fly Pilot — Drag Strip</h1>
+  <p>A mushroom-body-inspired controller (Kenyon cells → dopamine-gated MBON pools, plus a fast reflex path for the launch) drives a manual-shift dragster. Trained once, at nominal conditions. Replayed here, unmodified, against a hand-tuned baseline controller, under conditions it never trained on.</p>
+</header>
+
+<div class="scenario-row" id="scenarioRow"></div>
+<div class="scenario-desc" id="scenarioDesc"></div>
+
+<div class="compare-card">
+  <div class="compare-head">
+    <h3>All scenarios, side by side <span class="compare-hint">(click a row to jump to it)</span></h3>
+    <div class="compare-actions">
+      <button class="ghost-btn" id="resetTableBtn">Reset</button>
+      <button class="ghost-btn" id="reloadTableBtn" hidden>Reload results</button>
+    </div>
+  </div>
+  <div class="compare-scroll">
+    <table class="compare-table" id="compareTable"></table>
+  </div>
+  <p class="compare-empty" id="compareEmpty" hidden>Table cleared. Nothing computed client-side — these are pre-recorded evaluation runs, so "reload" just brings the same numbers back.</p>
+</div>
+
+<div class="stat-grid" id="statGrid"></div>
+
+<div class="transport">
+  <button id="playBtn" aria-label="Play">▶</button>
+  <span class="clock" id="clock">0.00s</span>
+  <input type="range" id="scrub" min="0" max="1000" value="0">
+  <div class="speed-select" id="speedSelect"></div>
+</div>
+
+<div class="lanes">
+  <div class="lane fly">
+    <div class="lane-head">
+      <div class="lane-title"><span class="dot"></span>Fly brain</div>
+      <div style="display:flex; align-items:center; gap:8px">
+        <span class="lane-time" id="flyTime">—</span>
+        <div class="lane-phase" id="flyPhase">—</div>
+      </div>
+    </div>
+    <div class="lane-body">
+      <div class="tree" id="flyTree"></div>
+      <canvas class="track" id="flyTrack"></canvas>
+    </div>
+    <div class="telemetry-row" id="flyTele"></div>
+  </div>
+  <div class="lane baseline">
+    <div class="lane-head">
+      <div class="lane-title"><span class="dot"></span>Baseline (rule-based)</div>
+      <div style="display:flex; align-items:center; gap:8px">
+        <span class="lane-time" id="baselineTime">—</span>
+        <div class="lane-phase" id="baselinePhase">—</div>
+      </div>
+    </div>
+    <div class="lane-body">
+      <div class="tree" id="baselineTree"></div>
+      <canvas class="track" id="baselineTrack"></canvas>
+    </div>
+    <div class="telemetry-row" id="baselineTele"></div>
+  </div>
+</div>
+
+<div class="charts">
+  <div class="chart-card">
+    <h3>Speed (m/s)</h3>
+    <svg class="chart" id="chartSpeed"></svg>
+  </div>
+  <div class="chart-card">
+    <h3>RPM (redline marked)</h3>
+    <svg class="chart" id="chartRpm"></svg>
+  </div>
+</div>
+
+<footer>flypilot · single trained brain, replayed unmodified across scenarios · lateral offset exaggerated ~6x for visibility</footer>
+
+<script>
+const SCENARIOS = [
+  {key:"nominal", label:"Nominal", desc:"Baseline physics: full engine power, full tire grip. <b>What the brain trained on.</b>"},
+  {key:"hot_engine", label:"Hot engine", desc:"Sustained heat derates torque to <b>75%</b> of nominal. Grip unchanged."},
+  {key:"cold_greasy_track", label:"Cold / greasy track", desc:"Rear grip cut to <b>65%</b> of nominal. Engine unchanged."},
+  {key:"patchy_grip", label:"Patchy grip", desc:"Grip <b>jitters tick to tick</b> (oil-down / bleach-box inconsistency), full average grip."},
+  {key:"worst_case", label:"Worst case", desc:"Hot engine (75% power) <b>and</b> cold, patchy track (65% grip, jitter) at once."},
+];
+
+let REPLAYS = null, STATS = null;
+let state = { scenario: "nominal", playing: false, t: 0, speed: 1, maxT: 12 };
+let rafId = null, lastFrameTime = null;
+
+async function boot(){
+  const [replaysRes, statsRes] = await Promise.all([
+    fetch('replays.json'), fetch('scenario_results.json')
+  ]);
+  REPLAYS = await replaysRes.json();
+  STATS = await statsRes.json();
+  buildScenarioButtons();
+  buildSpeedButtons();
+  buildCompareTable();
+  document.getElementById('resetTableBtn').addEventListener('click', resetCompareTable);
+  document.getElementById('reloadTableBtn').addEventListener('click', ()=>{
+    buildCompareTable();
+    document.getElementById('compareEmpty').hidden = true;
+    document.getElementById('reloadTableBtn').hidden = true;
+    document.getElementById('resetTableBtn').hidden = false;
+  });
+  document.getElementById('playBtn').addEventListener('click', togglePlay);
+  document.getElementById('scrub').addEventListener('input', e=>{
+    state.t = (e.target.value/1000) * state.maxT;
+    state.playing = false; updatePlayBtn();
+    render();
+  });
+  selectScenario('nominal');
+  requestAnimationFrame(loop);
+}
+
+function buildScenarioButtons(){
+  const row = document.getElementById('scenarioRow');
+  row.innerHTML = '';
+  for(const s of SCENARIOS){
+    const b = document.createElement('button');
+    b.className = 'scenario-btn'; b.textContent = s.label; b.dataset.key = s.key;
+    b.addEventListener('click', ()=>selectScenario(s.key));
+    row.appendChild(b);
+  }
+}
+function buildSpeedButtons(){
+  const row = document.getElementById('speedSelect');
+  row.innerHTML = '';
+  for(const m of [0.5,1,2,4]){
+    const b = document.createElement('button');
+    b.className = 'scenario-btn' + (m===1?' active':'');
+    b.textContent = m+'x';
+    b.addEventListener('click', ()=>{
+      state.speed = m;
+      [...row.children].forEach(c=>c.classList.remove('active'));
+      b.classList.add('active');
+    });
+    row.appendChild(b);
+  }
+}
+
+function unify(frames){
+  // build a single continuous clock: negative before green (staging wait), 0 at green.
+  let lastStagedT = 0;
+  for(const f of frames){ if(f.phase==='staged') lastStagedT = f.t; }
+  return frames.map(f=>({...f, u: f.phase==='staged' ? f.t - lastStagedT : f.t}));
+}
+
+function selectScenario(key){
+  state.scenario = key; state.t = 0; state.playing = false; updatePlayBtn();
+  [...document.querySelectorAll('.scenario-btn')].forEach(b=>{
+    b.classList.toggle('active', b.dataset.key===key);
+  });
+  const meta = SCENARIOS.find(s=>s.key===key);
+  document.getElementById('scenarioDesc').innerHTML = meta.desc;
+
+  const rep = REPLAYS[key];
+  rep.fly.u = unify(rep.fly.frames);
+  rep.baseline.u = unify(rep.baseline.frames);
+  const maxFly = rep.fly.u[rep.fly.u.length-1].u;
+  const maxBase = rep.baseline.u[rep.baseline.u.length-1].u;
+  state.maxT = Math.max(maxFly, maxBase, 1);
+
+  buildStatCards(STATS[key]);
+  buildCharts(rep);
+  [...document.querySelectorAll('#compareTable tbody tr')].forEach(tr=>{
+    tr.classList.toggle('active', tr.dataset.key===key);
+  });
+  render();
+}
+
+function buildStatCards(stat){
+  const grid = document.getElementById('statGrid');
+  grid.innerHTML = '';
+  for(const who of ['fly','baseline']){
+    const s = stat[who];
+    const pct = Math.round(100*s.finished/s.n);
+    const div = document.createElement('div');
+    div.className = 'stat-card ' + who;
+    div.innerHTML = `
+      <div class="who">${who==='fly'?'Fly brain':'Baseline'}</div>
+      <div class="figs">
+        <div class="fig"><div class="n ${pct===100?'good':(pct===0?'bad':'')}">${pct}%</div><div class="l">finished</div></div>
+        <div class="fig"><div class="n ${s.crashes>0?'bad':'good'}">${s.crashes}</div><div class="l">crashes / ${s.n}</div></div>
+        <div class="fig"><div class="n">${s.avg_time? s.avg_time.toFixed(2)+'s' : '—'}</div><div class="l">avg finish</div></div>
+      </div>`;
+    grid.appendChild(div);
+  }
+}
+
+function resetCompareTable(){
+  document.getElementById('compareTable').innerHTML = '';
+  document.getElementById('compareEmpty').hidden = false;
+  document.getElementById('reloadTableBtn').hidden = false;
+  document.getElementById('resetTableBtn').hidden = true;
+}
+
+function buildCompareTable(){
+  const table = document.getElementById('compareTable');
+  let html = `<thead><tr>
+    <th>Scenario</th>
+    <th class="grp-fly">Fly finish</th><th class="grp-fly">Fly crash</th><th class="grp-fly">Fly avg</th>
+    <th class="grp-baseline">Base finish</th><th class="grp-baseline">Base crash</th><th class="grp-baseline">Base avg</th>
+  </tr></thead><tbody>`;
+  for(const s of SCENARIOS){
+    const st = STATS[s.key];
+    html += row(s.key, s.label, st);
+  }
+  html += '</tbody>';
+  table.innerHTML = html;
+  [...table.querySelectorAll('tbody tr')].forEach(tr=>{
+    tr.addEventListener('click', ()=>selectScenario(tr.dataset.key));
+  });
+}
+
+function pctPill(finished, n){
+  const pct = Math.round(100*finished/n);
+  const cls = pct===100 ? 'good' : (pct===0 ? 'bad' : 'mid');
+  return `<span class="pill ${cls}">${pct}%</span>`;
+}
+
+function row(key, label, st){
+  const f = st.fly, b = st.baseline;
+  const active = key===state.scenario ? ' active' : '';
+  return `<tr data-key="${key}" class="${active.trim()}">
+    <td class="scen-label">${label}</td>
+    <td>${pctPill(f.finished,f.n)}</td>
+    <td class="${f.crashes>0?'bad':''}">${f.crashes}/${f.n}</td>
+    <td>${f.avg_time? f.avg_time.toFixed(2)+'s':'—'}</td>
+    <td>${pctPill(b.finished,b.n)}</td>
+    <td class="${b.crashes>0?'bad':''}">${b.crashes}/${b.n}</td>
+    <td>${b.avg_time? b.avg_time.toFixed(2)+'s':'—'}</td>
+  </tr>`;
+}
+
+function togglePlay(){
+  state.playing = !state.playing;
+  if(state.t >= state.maxT) state.t = 0;
+  updatePlayBtn();
+}
+function updatePlayBtn(){ document.getElementById('playBtn').textContent = state.playing ? '⏸' : '▶'; }
+
+function loop(ts){
+  if(lastFrameTime==null) lastFrameTime = ts;
+  const dt = (ts - lastFrameTime)/1000; lastFrameTime = ts;
+  if(state.playing){
+    state.t += dt*state.speed;
+    if(state.t >= state.maxT){ state.t = state.maxT; state.playing = false; updatePlayBtn(); }
+    render();
+  }
+  rafId = requestAnimationFrame(loop);
+}
+
+function frameAt(u_frames, t){
+  let f = u_frames[0];
+  for(const fr of u_frames){ if(fr.u <= t) f = fr; else break; }
+  return f;
+}
+
+function render(){
+  document.getElementById('clock').textContent = state.t.toFixed(2)+'s';
+  document.getElementById('scrub').value = Math.round(1000*state.t/state.maxT);
+  const rep = REPLAYS[state.scenario];
+  renderLane('fly', rep.fly);
+  renderLane('baseline', rep.baseline);
+  updatePlayheads();
+}
+
+function renderLane(who, rep){
+  const f = frameAt(rep.u, state.t);
+  const phaseEl = document.getElementById(who+'Phase');
+  phaseEl.textContent = f.phase;
+  phaseEl.className = 'lane-phase ' + f.phase;
+
+  const timeEl = document.getElementById(who+'Time');
+  if(f.u < 0){
+    timeEl.textContent = '—'; timeEl.className = 'lane-time';
+  } else if(f.phase === 'finished'){
+    timeEl.textContent = rep.elapsed_time.toFixed(2)+'s'; timeEl.className = 'lane-time final';
+  } else if(f.phase === 'crash'){
+    timeEl.textContent = f.u.toFixed(2)+'s (crashed)'; timeEl.className = 'lane-time final';
+  } else {
+    timeEl.textContent = f.u.toFixed(2)+'s'; timeEl.className = 'lane-time';
+  }
+
+  const tree = document.getElementById(who+'Tree');
+  const staged = f.phase === 'staged';
+  const green = f.phase !== 'staged';
+  tree.innerHTML = `
+    <div class="bulb amber ${staged?'on':''}"></div>
+    <div class="bulb amber ${staged?'on':''}"></div>
+    <div class="bulb green ${green?'on':''}"></div>`;
+
+  drawTrack(document.getElementById(who+'Track'), rep, f);
+
+  const tele = document.getElementById(who+'Tele');
+  const rpmFrac = Math.min(1, f.rpm / rep.redline);
+  const hot = rpmFrac > 0.9;
+  tele.innerHTML = `
+    <div class="tele"><div class="l">Speed</div><div class="v">${f.v.toFixed(1)} m/s</div></div>
+    <div class="tele"><div class="l">RPM · gear ${f.gear}/${rep.top_gear}</div><div class="v">${Math.round(f.rpm)}</div>
+      <div class="bar-track"><div class="bar-fill ${hot?'rpm-hot':''}" style="width:${rpmFrac*100}%"></div></div></div>
+    <div class="tele"><div class="l">Throttle</div><div class="v">${Math.round(f.throttle*100)}%</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${f.throttle*100}%"></div></div></div>
+    <div class="tele"><div class="l">Wheel slip</div><div class="v">${Math.round(f.slip*100)}%</div>
+      <div class="bar-track"><div class="bar-fill ${f.slip>0.3?'rpm-hot':''}" style="width:${f.slip*100}%"></div></div></div>
+  `;
+}
+
+function drawTrack(canvas, rep, f){
+  const dpr = window.devicePixelRatio||1;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if(canvas.width !== w*dpr || canvas.height !== h*dpr){
+    canvas.width = w*dpr; canvas.height = h*dpr;
+  }
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+
+  const laneTop = h*0.28, laneBot = h*0.72, laneH = laneBot-laneTop;
+  // curb rails
+  ctx.strokeStyle = '#3a4552'; ctx.lineWidth = 2;
+  ctx.setLineDash([6,5]);
+  ctx.beginPath(); ctx.moveTo(0,laneTop); ctx.lineTo(w,laneTop); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0,laneBot); ctx.lineTo(w,laneBot); ctx.stroke();
+  ctx.setLineDash([]);
+  // center line
+  ctx.strokeStyle = '#232a32'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0,(laneTop+laneBot)/2); ctx.lineTo(w,(laneTop+laneBot)/2); ctx.stroke();
+  // finish line
+  const finishX = w - 6;
+  ctx.strokeStyle = '#e9edf2'; ctx.globalAlpha = 0.35; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(finishX,laneTop); ctx.lineTo(finishX,laneBot); ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  const xFrac = Math.min(1, f.x / rep.track_length);
+  const carX = 4 + xFrac*(w-8);
+  const yExaggerate = 6; // lateral offset exaggerated for visibility
+  const yFrac = Math.max(-1,Math.min(1, (f.y/rep.lane_half_width)*yExaggerate/6 * 6));
+  const carY = (laneTop+laneBot)/2 + (f.y/rep.lane_half_width)*(laneH/2)*yExaggerate/6*6;
+  const clampedY = Math.max(laneTop+4, Math.min(laneBot-4, carY));
+
+  const crashed = f.phase === 'crash';
+  ctx.fillStyle = crashed ? '#ef4a5f' : (canvas.id.startsWith('fly') ? '#4fd1e8' : '#a48cf2');
+  ctx.beginPath();
+  ctx.moveTo(carX+7, clampedY);
+  ctx.lineTo(carX-6, clampedY-4.5);
+  ctx.lineTo(carX-6, clampedY+4.5);
+  ctx.closePath(); ctx.fill();
+
+  if(crashed){
+    ctx.strokeStyle = '#ef4a5f'; ctx.lineWidth = 2; ctx.globalAlpha = 0.8;
+    ctx.beginPath(); ctx.arc(carX, clampedY, 10, 0, Math.PI*2); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+}
+
+function buildCharts(rep){
+  drawChart('chartSpeed', rep, d=>d.v, [0, 30]);
+  drawChart('chartRpm', rep, d=>d.rpm, [0, rep.fly.redline*1.02], rep.fly.redline);
+}
+
+function drawChart(svgId, rep, accessor, yDomain, redline){
+  const svg = document.getElementById(svgId);
+  const w = 400, h = 110, pad = 4;
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  const paths = {fly:'#4fd1e8', baseline:'#a48cf2'};
+  let inner = '';
+  const maxT = state.maxT;
+  for(const who of ['fly','baseline']){
+    const u = rep[who].u;
+    let d = '';
+    for(let i=0;i<u.length;i++){
+      const px = pad + (u[i].u/maxT) * (w-2*pad);
+      const val = Math.max(yDomain[0], Math.min(yDomain[1], accessor(u[i])));
+      const py = h-pad - ((val-yDomain[0])/(yDomain[1]-yDomain[0])) * (h-2*pad);
+      d += (i===0?'M':'L') + px.toFixed(1) + ' ' + py.toFixed(1) + ' ';
+    }
+    inner += `<path d="${d}" fill="none" stroke="${paths[who]}" stroke-width="1.8" stroke-linejoin="round"/>`;
+  }
+  if(redline){
+    const py = h-pad - ((redline-yDomain[0])/(yDomain[1]-yDomain[0])) * (h-2*pad);
+    inner += `<line x1="0" y1="${py}" x2="${w}" y2="${py}" stroke="#ef4a5f" stroke-width="1" stroke-dasharray="3,3" opacity="0.6"/>`;
+  }
+  inner += `<line id="${svgId}-playhead" x1="0" y1="0" x2="0" y2="${h}" stroke="#e9edf2" stroke-width="1" opacity="0.5"/>`;
+  svg.innerHTML = inner;
+}
+
+function updatePlayheads(){
+  const w = 400, pad = 4;
+  const px = pad + (state.t/state.maxT) * (w-2*pad);
+  for(const id of ['chartSpeed-playhead','chartRpm-playhead']){
+    const el = document.getElementById(id);
+    if(el){ el.setAttribute('x1',px); el.setAttribute('x2',px); }
+  }
+}
+
+boot();
+</script>
