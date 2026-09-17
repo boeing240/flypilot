@@ -60,5 +60,11 @@
     "avg_time": 13.74,
     "kept_as_best": false,
     "note": "stable, still not better than gen1 avg_time"
+  },
+  {
+    "milestone": "switched to TD(0) value-baseline for longitudinal stream, kept old scalar baseline for lateral",
+    "note": "from-scratch population run (population=8, train=4000, seed=1): best 100% finish, 0 crashes, avg_time=11.29s (seed=804423) -- beats prior best of 12.18s. Uniform TD(0) for both streams badly broke steering (100% crash across all genomes); splitting by compartment fixed it and improved on the old scalar-only baseline result.",
+    "kept_as_best": true,
+    "avg_time": 11.29
   }
 ]

@@ -13,15 +13,15 @@ from .baseline import BaselineController
 from .env import DragStripEnv
 from .replay import record_baseline_episode, record_fly_episode
 from .scenarios import SCENARIOS
-from .sense import SenseEncoder
+from .sense import N_PN, SenseEncoder
 from .train import run_baseline_episode, run_fly_episode
-from .learning import DopamineTracker
+from .learning import DopamineTracker, ValueDopamineTracker
 
 
 def eval_scenario(name, kwargs, brain, baseline, n_episodes, seed0):
     env = DragStripEnv(**kwargs)
     encoder = SenseEncoder()
-    dlon, dlat = DopamineTracker(), DopamineTracker()
+    dlon, dlat = ValueDopamineTracker(N_PN), DopamineTracker()
 
     fly_results = [
         run_fly_episode(env, brain, encoder, dlon, dlat, seed=seed0 + i, learn=False)

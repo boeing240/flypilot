@@ -110,16 +110,62 @@ normal-slip activity patterns) rather than a guess -- worth testing before
 trusting any fix for it.
 
 **Next candidates (not yet tried):**
-- A TD-style value baseline per state (not just a global running-reward
-  baseline) so dopamine reflects "better than expected from here," which
-  naturally credits actions that trade a small immediate cost for a larger
-  future gain.
 - A genuine multi-tick eligibility trace, done correctly this time: decay the
   trace but keep dopamine and noise properly time-aligned (e.g. accumulate
   trace but only apply it once per meaningful event, not every tick against
   a moving target).
-- Simplest fix worth trying first: shape a small dense reward directly for
-  RPM staying in a "useful" band and for making a shift when the powerband is
-  exceeded, so throttle/shift gets the same kind of immediate, informative
-  signal steering already has -- sidestepping the credit-assignment problem
-  rather than solving it in general.
+
+## 2026-09-18 — TD(0) value baseline for longitudinal dopamine only
+
+**Tried:** the "next candidate" above -- replace the scalar running-average
+dopamine baseline with a proper value function, `V(pn)` linear in the
+sensory (PN) state, learned online via TD(0): `dopamine = reward +
+gamma*V(s') - V(s)` instead of `reward - running_mean(reward)`. The point is
+bootstrapping: `V(s)` learns to predict *future* return, so a terminal
+finish bonus can propagate backward into earlier states' value estimates
+over the course of training, instead of only ever mattering on the one tick
+it's paid out -- directly targeting the myopic credit-assignment gap this
+log already diagnosed for throttle/shift.
+
+**First attempt failed badly.** Applying TD(0) to *both* dopamine streams
+(longitudinal and lateral) took steering from "0 crashes, solid" to 100%
+crash rate across every genome tested, including the exact seed that
+previously trained cleanly under the old baseline. Root cause: `V` starts at
+zero and is itself only learned online, so early in training its estimates
+are noisy garbage -- and because rewards here are dominated by rare large
+terminal bonuses/penalties (crash -50, finish up to +20ish) next to tiny
+per-tick shaping terms, an unreliable `V` can inject terminal-reward-scale
+noise into the TD error on *every* tick, not just the rare terminal one.
+That's strictly worse than the old baseline for a stream whose reward is
+already dense and easy to learn (the lateral centering reward): there was no
+delayed-credit problem there to fix, so all TD(0) added was noise. Lowering
+the value learning rate (0.02 -> 0.005) and clipping the TD error to +/-10
+made it somewhat less catastrophic but didn't fix it.
+
+**Fix: split by compartment, matching what's already compartmentalized.**
+Kept the old scalar running-average baseline for the *lateral* stream
+(nothing to fix there) and used TD(0) only for the *longitudinal* stream
+(the one actually diagnosed as myopic). This is the same reasoning that
+motivated splitting dopamine into two streams in the first place -- different
+compartments have different reinforcement problems, so they shouldn't
+necessarily share a learning rule either, not just a raw signal.
+
+**Result:** from-scratch population selection (population 8, 4000 episodes,
+same seed as the earlier 12.18s run) found a best individual at 100% finish,
+0 crashes, avg 11.29s -- beating the previous best (12.18s) with the same
+training budget. Population variance is still high (3/8 genomes trained
+cleanly; the rest crashed completely or timed out), so this isn't a fix for
+the underlying seed-sensitivity/robustness issues, but it is a genuine
+improvement in achievable peak performance, and confirms the diagnosis: the
+longitudinal stream's problem really was baseline myopia, and fixing it
+where the problem actually was (rather than uniformly) is what made it work.
+
+**Next candidates (not yet tried):**
+- The KC-overlap / traction-loss generalization failure from the section
+  above is still unexplained and untouched by this change.
+- A genuine multi-tick eligibility trace (see above) is still untried, and
+  could compound with the TD baseline rather than replace it.
+- Population variance is still high even with TD(0) -- worth checking
+  whether the same finetune-scale + checkpointing approach from evolve.py's
+  `--continue-from` mode does better at improving on an 11.29s individual
+  than it did on the old 12.18s one.

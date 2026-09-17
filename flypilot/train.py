@@ -5,7 +5,7 @@ import statistics as stats
 
 from .brain import FlyBrain
 from .env import Action, DragStripEnv
-from .learning import DopamineTracker
+from .learning import DopamineTracker, ValueDopamineTracker
 from .sense import N_PN, SenseEncoder
 
 
@@ -20,7 +20,7 @@ def fitness_key(summary):
 
 def evaluate(brain: FlyBrain, env: DragStripEnv, encoder: SenseEncoder,
              n_episodes: int, seed0: int) -> dict:
-    dlon, dlat = DopamineTracker(), DopamineTracker()
+    dlon, dlat = ValueDopamineTracker(N_PN), DopamineTracker()
     results = [
         run_fly_episode(env, brain, encoder, dlon, dlat, seed=seed0 + i, learn=False)
         for i in range(n_episodes)
@@ -37,15 +37,28 @@ def evaluate(brain: FlyBrain, env: DragStripEnv, encoder: SenseEncoder,
 
 
 def run_fly_episode(env: DragStripEnv, brain: FlyBrain, encoder: SenseEncoder,
-                     dopamine_lon: DopamineTracker, dopamine_lat: DopamineTracker,
+                     dopamine_lon: ValueDopamineTracker, dopamine_lat: DopamineTracker,
                      seed: int, learn: bool = True) -> dict:
     obs = env.reset(seed=seed)
     encoder.reset()
     brain.reset()
     total_reward = 0.0
     ticks = 0
+    # TD(0) needs the *next* state to bootstrap from, which isn't available
+    # until the following iteration -- so each transition (pn, reward) is
+    # held in `pending` and closed out one tick later, using this tick's pn
+    # as the next-state for it. That close-out must happen *before* this
+    # tick's forward() call, since forward() overwrites brain.eligibility
+    # (the trace the dopamine signal needs to gate) with a fresh one for the
+    # new action.
+    pending = None
     while True:
         pn = encoder.encode(obs)
+        if learn and pending is not None:
+            prev_pn, prev_r_lon, prev_r_lat = pending
+            d_lon = dopamine_lon.step(prev_r_lon, prev_pn, pn)
+            d_lat = dopamine_lat.step(prev_r_lat, prev_pn, pn)
+            brain.apply_dopamine(d_lon, d_lat)
         out = brain.forward(pn, encoder._green_trace, explore=learn)
         # not-before-green is a hard safety gate, not something worth spending
         # learning capacity (and risking foul-start crashes) on -- the reflex
@@ -55,12 +68,14 @@ def run_fly_episode(env: DragStripEnv, brain: FlyBrain, encoder: SenseEncoder,
         action = Action(throttle=throttle, steer=out["steer"], shift=out["shift"])
         obs, reward, done, info = env.step(action)
         total_reward += reward
-        if learn and not staged:
-            d_lon = dopamine_lon.step(info["reward_lon"])
-            d_lat = dopamine_lat.step(info["reward_lat"])
-            brain.apply_dopamine(d_lon, d_lat)
+        pending = (pn, info["reward_lon"], info["reward_lat"]) if not staged else None
         ticks += 1
         if done or ticks > 1500:  # 30s of race clock -- generous, real runs finish well under 15s
+            if learn and pending is not None:
+                prev_pn, prev_r_lon, prev_r_lat = pending
+                d_lon = dopamine_lon.step(prev_r_lon, prev_pn, None)  # terminal: no bootstrap
+                d_lat = dopamine_lat.step(prev_r_lat, prev_pn, None)
+                brain.apply_dopamine(d_lon, d_lat)
             break
     return {
         "phase": obs.phase,
@@ -112,7 +127,7 @@ def continue_train(brain: FlyBrain, n_episodes: int, report_every: int = 200,
     """
     env = DragStripEnv()
     encoder = SenseEncoder()
-    dopamine_lon = DopamineTracker()
+    dopamine_lon = ValueDopamineTracker(N_PN)
     dopamine_lat = DopamineTracker()
 
     best_brain = None

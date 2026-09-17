@@ -6,7 +6,7 @@ import statistics as stats
 from .baseline import BaselineController
 from .brain import FlyBrain
 from .env import DragStripEnv
-from .learning import DopamineTracker
+from .learning import DopamineTracker, ValueDopamineTracker
 from .sense import N_PN, SenseEncoder
 from .train import run_baseline_episode, run_fly_episode, train
 
@@ -40,7 +40,7 @@ def main():
 
     env = DragStripEnv()
     encoder = SenseEncoder()
-    dopamine_lon = DopamineTracker()
+    dopamine_lon = ValueDopamineTracker(N_PN)
     dopamine_lat = DopamineTracker()
     fly_results = [
         run_fly_episode(env, brain, encoder, dopamine_lon, dopamine_lat, seed=10_000 + i, learn=False)
