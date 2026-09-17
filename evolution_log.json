@@ -1,0 +1,64 @@
+[
+  {
+    "generation": 1,
+    "seed": 876363,
+    "finish_rate": 100,
+    "crashes": 0,
+    "avg_time": 12.18,
+    "kept_as_best": true
+  },
+  {
+    "generation": 2,
+    "seed": 800875,
+    "finish_rate": 100,
+    "crashes": 0,
+    "avg_time": 14.53,
+    "kept_as_best": false,
+    "note": "worse than gen1, best-ever pointer unchanged"
+  },
+  {
+    "generation": 3,
+    "note": "duplicate of gen2 due to fixed default --seed=1 producing identical clone seeds; discarded, no state change",
+    "kept_as_best": false
+  },
+  {
+    "generation": 4,
+    "seed_arg": 3,
+    "best_child_seed": 136758,
+    "finish_rate": 100,
+    "crashes": 0,
+    "avg_time": 16.7,
+    "kept_as_best": false,
+    "note": "worse than gen1, best-ever pointer unchanged"
+  },
+  {
+    "generation": 5,
+    "seed_arg": 5,
+    "best_child_seed": 777820,
+    "finish_rate": 100,
+    "crashes": 0,
+    "avg_time": 13.39,
+    "kept_as_best": false,
+    "note": "finetune_scale=0.3 + checkpointing: 5/6 clones finished with 0 crashes (big stability improvement), still slightly worse than gen1"
+  },
+  {
+    "generation": 6,
+    "seed_arg": 6,
+    "best_child_seed": 601693,
+    "finish_rate": 100,
+    "crashes": 0,
+    "avg_time": 13.32,
+    "kept_as_best": false,
+    "note": "stable population (0 crashes across all 6), still slightly worse than gen1 avg_time"
+  },
+  {
+    "generation": 7,
+    "seed_arg": 7,
+    "best_child_seed": 158176,
+    "finish_rate": 100,
+    "crashes": 0,
+    "avg_time": 13.74,
+    "kept_as_best": false,
+    "note": "stable, still not better than gen1 avg_time"
+  }
+]

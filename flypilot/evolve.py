@@ -9,41 +9,65 @@ survivor. Cheap here because one individual trains in ~1-2 minutes.
 from __future__ import annotations
 
 import argparse
+import copy
 import json
+import os
 import pickle
 import random
-import statistics as stats
+from concurrent.futures import ProcessPoolExecutor
+
+import numpy as np
 
 from .env import DragStripEnv
-from .learning import DopamineTracker
 from .sense import SenseEncoder
-from .train import run_fly_episode, train
+from .train import continue_train, evaluate, fitness_key, train
 
 
-def fitness_key(summary):
-    # lexicographic: finish rate first, then crash rate, then speed -- a fast
-    # individual that crashes is worse than a slow one that always finishes.
-    finish_rate = summary["finished"] / summary["n"]
-    crash_rate = summary["crashes"] / summary["n"]
-    avg_time = summary["avg_time"] if summary["avg_time"] is not None else 1e9
-    return (-finish_rate, crash_rate, avg_time)
+def genome_str(genome):
+    extra = "".join(f" {k}={v}" for k, v in genome.items() if k != "seed")
+    return f"seed={genome['seed']}{extra}"
 
 
-def evaluate(brain, env, encoder, n_episodes, seed0):
-    dlon, dlat = DopamineTracker(), DopamineTracker()
-    results = [
-        run_fly_episode(env, brain, encoder, dlon, dlat, seed=seed0 + i, learn=False)
-        for i in range(n_episodes)
-    ]
-    finished = [r for r in results if r["phase"] == "finished"]
-    crashes = sum(1 for r in results if r["phase"] == "crash")
-    return {
-        "n": n_episodes,
-        "finished": len(finished),
-        "crashes": crashes,
-        "avg_time": stats.mean(r["elapsed_time"] for r in finished) if finished else None,
-        "best_time": min((r["elapsed_time"] for r in finished), default=None),
-    }
+def _train_and_evaluate(genome, train_episodes, eval_episodes):
+    # Runs in a worker process: builds its own env/encoder, so nothing is
+    # shared with the parent or with sibling workers.
+    brain = train(
+        n_episodes=train_episodes,
+        seed0=genome["seed"],
+        brain_kwargs={"noise_sigma": genome["noise_sigma"], "eta": genome["eta"]},
+        quiet=True,
+    )
+    env = DragStripEnv()
+    encoder = SenseEncoder()
+    summary = evaluate(brain, env, encoder, eval_episodes, seed0=90_000)
+    summary["genome"] = genome
+    return summary, brain
+
+
+def _continue_and_evaluate(parent_brain, genome, train_episodes, eval_episodes,
+                            finetune_scale, checkpoint_every, checkpoint_episodes):
+    # Clone the parent's learned weights, but reseed the clone's own RNG --
+    # otherwise every clone would draw the exact same exploration noise as
+    # its siblings (same weights + same rng state = identical trajectory)
+    # and training them separately would be pointless.
+    brain = copy.deepcopy(parent_brain)
+    brain.rng = np.random.default_rng(genome["seed"])
+    # The plasticity rule never converges -- it keeps making eta-sized noisy
+    # updates for as long as training runs. Continuing at full strength on an
+    # already-good brain is a random walk that's as likely to wander away
+    # from the optimum as toward it, so scale eta/noise_sigma down for a
+    # gentler fine-tune instead of a second full training run.
+    brain.eta *= finetune_scale
+    brain.noise_sigma *= finetune_scale
+    brain = continue_train(
+        brain, train_episodes, seed0=genome["seed"], quiet=True,
+        checkpoint_every=checkpoint_every, checkpoint_episodes=checkpoint_episodes,
+    )
+    env = DragStripEnv()
+    encoder = SenseEncoder()
+    summary = evaluate(brain, env, encoder, eval_episodes, seed0=90_000)
+    summary["genome"] = genome
+    return summary, brain
 
 
 def main():
@@ -54,36 +78,69 @@ def main():
     ap.add_argument("--out", default="flypilot_brain.pkl")
     ap.add_argument("--leaderboard-out", default="evolve_leaderboard.json")
     ap.add_argument("--seed", type=int, default=1)
+    ap.add_argument("--workers", type=int, default=os.cpu_count(),
+                     help="parallel worker processes (default: all cores)")
+    ap.add_argument("--continue-from", default=None,
+                     help="pickle of a previously-trained brain; population becomes "
+                          "clones of it, each continuing training independently, "
+                          "instead of fresh random individuals")
+    ap.add_argument("--finetune-scale", type=float, default=0.3,
+                     help="multiply eta/noise_sigma by this when continuing training "
+                          "from a parent brain, so it's a gentle fine-tune rather than "
+                          "a second full-strength training run (only used with "
+                          "--continue-from)")
+    ap.add_argument("--checkpoint-every", type=int, default=300,
+                     help="when continuing training, periodically freeze and evaluate "
+                          "the brain and keep the best checkpoint seen instead of just "
+                          "the final episode's weights (only used with --continue-from; "
+                          "0 disables checkpointing)")
+    ap.add_argument("--checkpoint-episodes", type=int, default=30,
+                     help="episodes used for each checkpoint evaluation")
     args = ap.parse_args()
 
     rng = random.Random(args.seed)
-    genomes = []
-    for i in range(args.population):
-        genomes.append({
-            "seed": rng.randint(0, 1_000_000),
-            "noise_sigma": round(rng.uniform(0.3, 0.9), 3),
-            "eta": round(rng.uniform(0.01, 0.04), 4),
-        })
-
-    env = DragStripEnv()
-    encoder = SenseEncoder()
+    parent_brain = None
+    if args.continue_from:
+        with open(args.continue_from, "rb") as f:
+            parent_brain = pickle.load(f)
+        genomes = [{"seed": rng.randint(0, 1_000_000)} for _ in range(args.population)]
+    else:
+        genomes = [
+            {
+                "seed": rng.randint(0, 1_000_000),
+                "noise_sigma": round(rng.uniform(0.3, 0.9), 3),
+                "eta": round(rng.uniform(0.01, 0.04), 4),
+            }
+            for _ in range(args.population)
+        ]
 
     leaderboard = []
-    for i, genome in enumerate(genomes):
-        print(f"=== individual {i+1}/{len(genomes)}  seed={genome['seed']} "
-              f"noise_sigma={genome['noise_sigma']} eta={genome['eta']} ===")
-        brain = train(
-            n_episodes=args.train_episodes,
-            seed0=genome["seed"],
-            brain_kwargs={"noise_sigma": genome["noise_sigma"], "eta": genome["eta"]},
-            quiet=True,
-        )
-        summary = evaluate(brain, env, encoder, args.eval_episodes, seed0=90_000)
-        summary["genome"] = genome
-        leaderboard.append((summary, brain))
-        finish_rate = round(100 * summary["finished"] / summary["n"])
-        t = f"{summary['avg_time']:.2f}s" if summary["avg_time"] else "-"
-        print(f"    -> finished {finish_rate}%  crashes {summary['crashes']}/{summary['n']}  avg_time {t}")
+    workers = max(1, min(args.workers, len(genomes)))
+    print(f"training {len(genomes)} individuals across {workers} worker process(es)"
+          f"{' (continuing from ' + args.continue_from + ')' if parent_brain else ''}...")
+    with ProcessPoolExecutor(max_workers=workers) as pool:
+        if parent_brain is not None:
+            checkpoint_every = args.checkpoint_every or None
+            futures = {
+                pool.submit(_continue_and_evaluate, parent_brain, genome,
+                            args.train_episodes, args.eval_episodes,
+                            args.finetune_scale, checkpoint_every, args.checkpoint_episodes): i
+                for i, genome in enumerate(genomes)
+            }
+        else:
+            futures = {
+                pool.submit(_train_and_evaluate, genome, args.train_episodes, args.eval_episodes): i
+                for i, genome in enumerate(genomes)
+            }
+        for future in futures:
+            i = futures[future]
+            genome = genomes[i]
+            summary, brain = future.result()
+            leaderboard.append((summary, brain))
+            finish_rate = round(100 * summary["finished"] / summary["n"])
+            t = f"{summary['avg_time']:.2f}s" if summary["avg_time"] else "-"
+            print(f"individual {i+1}/{len(genomes)}  {genome_str(genome)}  "
+                  f"-> finished {finish_rate}%  crashes {summary['crashes']}/{summary['n']}  avg_time {t}")
 
     leaderboard.sort(key=lambda pair: fitness_key(pair[0]))
 
@@ -92,8 +149,7 @@ def main():
     for rank, (summary, _brain) in enumerate(leaderboard):
         finish_rate = round(100 * summary["finished"] / summary["n"])
         t = f"{summary['avg_time']:.2f}s" if summary["avg_time"] else "-"
-        print(f"{rank+1}. seed={summary['genome']['seed']} "
-              f"noise_sigma={summary['genome']['noise_sigma']} eta={summary['genome']['eta']}  "
+        print(f"{rank+1}. {genome_str(summary['genome'])}  "
               f"finished {finish_rate}%  crashes {summary['crashes']}/{summary['n']}  avg_time {t}")
         table.append({k: v for k, v in summary.items()})
 

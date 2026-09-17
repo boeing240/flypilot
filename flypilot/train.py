@@ -1,11 +1,39 @@
 from __future__ import annotations
 
+import copy
 import statistics as stats
 
 from .brain import FlyBrain
 from .env import Action, DragStripEnv
 from .learning import DopamineTracker
 from .sense import N_PN, SenseEncoder
+
+
+def fitness_key(summary):
+    # lexicographic: finish rate first, then crash rate, then speed -- a fast
+    # individual that crashes is worse than a slow one that always finishes.
+    finish_rate = summary["finished"] / summary["n"]
+    crash_rate = summary["crashes"] / summary["n"]
+    avg_time = summary["avg_time"] if summary["avg_time"] is not None else 1e9
+    return (-finish_rate, crash_rate, avg_time)
+
+
+def evaluate(brain: FlyBrain, env: DragStripEnv, encoder: SenseEncoder,
+             n_episodes: int, seed0: int) -> dict:
+    dlon, dlat = DopamineTracker(), DopamineTracker()
+    results = [
+        run_fly_episode(env, brain, encoder, dlon, dlat, seed=seed0 + i, learn=False)
+        for i in range(n_episodes)
+    ]
+    finished = [r for r in results if r["phase"] == "finished"]
+    crashes = sum(1 for r in results if r["phase"] == "crash")
+    return {
+        "n": n_episodes,
+        "finished": len(finished),
+        "crashes": crashes,
+        "avg_time": stats.mean(r["elapsed_time"] for r in finished) if finished else None,
+        "best_time": min((r["elapsed_time"] for r in finished), default=None),
+    }
 
 
 def run_fly_episode(env: DragStripEnv, brain: FlyBrain, encoder: SenseEncoder,
@@ -63,11 +91,42 @@ def run_baseline_episode(env: DragStripEnv, controller, seed: int) -> dict:
 
 def train(n_episodes: int = 3000, report_every: int = 200, seed0: int = 0,
           brain_kwargs: dict | None = None, quiet: bool = False) -> FlyBrain:
+    brain = FlyBrain(n_pn=N_PN, seed=seed0, **(brain_kwargs or {}))
+    return continue_train(brain, n_episodes, report_every=report_every, seed0=seed0, quiet=quiet)
+
+
+def continue_train(brain: FlyBrain, n_episodes: int, report_every: int = 200,
+                    seed0: int = 0, quiet: bool = False,
+                    checkpoint_every: int | None = None,
+                    checkpoint_episodes: int = 30,
+                    checkpoint_seed0: int = 500_000) -> FlyBrain:
+    """Keeps training an already-initialized brain (e.g. a clone of a winner
+    from a previous selection round) instead of starting from scratch.
+
+    The node-perturbation plasticity rule never converges -- it keeps making
+    noisy updates for as long as training runs, so continuing to train an
+    already-good brain is as likely to wander away from that optimum as to
+    improve it. If `checkpoint_every` is set, the brain is periodically
+    frozen and evaluated on a small held-out set, and the *best* checkpoint
+    seen is returned instead of just whatever the final episode left behind.
+    """
     env = DragStripEnv()
     encoder = SenseEncoder()
-    brain = FlyBrain(n_pn=N_PN, seed=seed0, **(brain_kwargs or {}))
     dopamine_lon = DopamineTracker()
     dopamine_lat = DopamineTracker()
+
+    best_brain = None
+    best_fitness = None
+
+    def maybe_checkpoint():
+        nonlocal best_brain, best_fitness
+        if checkpoint_every is None:
+            return
+        summary = evaluate(brain, env, encoder, checkpoint_episodes, seed0=checkpoint_seed0)
+        fit = fitness_key(summary)
+        if best_fitness is None or fit < best_fitness:
+            best_fitness = fit
+            best_brain = copy.deepcopy(brain)
 
     window = []
     for ep in range(n_episodes):
@@ -75,6 +134,8 @@ def train(n_episodes: int = 3000, report_every: int = 200, seed0: int = 0,
             env, brain, encoder, dopamine_lon, dopamine_lat, seed=seed0 + ep, learn=True
         )
         window.append(result)
+        if checkpoint_every and (ep + 1) % checkpoint_every == 0:
+            maybe_checkpoint()
         if not quiet and (ep + 1) % report_every == 0:
             recent = window[-report_every:]
             finishes = [r for r in recent if r["phase"] == "finished"]
@@ -88,7 +149,11 @@ def train(n_episodes: int = 3000, report_every: int = 200, seed0: int = 0,
                 f"foul {fouls:3d}  crash {crashes:3d}  timeout {timeouts:3d}  "
                 f"avg_finish_time {avg_time:6.2f}s  avg_reward {avg_reward:7.2f}"
             )
-    return brain
+
+    if checkpoint_every is None:
+        return brain
+    maybe_checkpoint()  # always check the final state too
+    return best_brain
 
 
 if __name__ == "__main__":
