@@ -73,5 +73,13 @@
     "kept_as_best": true,
     "avg_time_nominal": 15.04,
     "traction_loss_scenarios_fixed": true
+  },
+  {
+    "milestone": "found genome that is both fast and fully robust (seed=863576, lat_kc_fraction=0.25)",
+    "note": "population selection (16 individuals, seed=3) found an individual matching baseline speed AND reliability on every robustness scenario: 150/150 finish, 0 crashes on nominal/hot_engine/cold_greasy_track/patchy_grip/worst_case, within ~0.2s of baseline everywhere. Promoted to flypilot_brain.pkl.",
+    "kept_as_best": true,
+    "avg_time_nominal": 10.29,
+    "all_scenarios_finish_rate": "150/150",
+    "all_scenarios_crashes": 0
   }
 ]

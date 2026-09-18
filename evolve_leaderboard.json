@@ -3,36 +3,36 @@
     "n": 150,
     "finished": 150,
     "crashes": 0,
-    "avg_time": 15.0393333333331,
-    "best_time": 14.839999999999772,
+    "avg_time": 10.29239999999987,
+    "best_time": 10.25999999999987,
     "genome": {
-      "seed": 220153,
-      "noise_sigma": 0.356,
-      "eta": 0.0109
+      "seed": 863576,
+      "noise_sigma": 0.819,
+      "eta": 0.0242
     }
   },
   {
     "n": 150,
     "finished": 150,
     "crashes": 0,
-    "avg_time": 15.466266666666426,
-    "best_time": 15.119999999999767,
+    "avg_time": 11.188133333333184,
+    "best_time": 10.73999999999986,
     "genome": {
-      "seed": 107192,
-      "noise_sigma": 0.841,
-      "eta": 0.0109
+      "seed": 249523,
+      "noise_sigma": 0.656,
+      "eta": 0.0139
     }
   },
   {
     "n": 150,
     "finished": 150,
     "crashes": 0,
-    "avg_time": 21.839999999999623,
-    "best_time": 21.839999999999623,
+    "avg_time": 12.576133333333154,
+    "best_time": 12.519999999999822,
     "genome": {
-      "seed": 140891,
-      "noise_sigma": 0.642,
-      "eta": 0.0341
+      "seed": 492025,
+      "noise_sigma": 0.456,
+      "eta": 0.017
     }
   },
   {
@@ -42,9 +42,45 @@
     "avg_time": 21.93999999999962,
     "best_time": 21.93999999999962,
     "genome": {
-      "seed": 471325,
-      "noise_sigma": 0.583,
-      "eta": 0.0214
+      "seed": 751984,
+      "noise_sigma": 0.582,
+      "eta": 0.0351
+    }
+  },
+  {
+    "n": 150,
+    "finished": 150,
+    "crashes": 0,
+    "avg_time": 21.93999999999962,
+    "best_time": 21.93999999999962,
+    "genome": {
+      "seed": 142573,
+      "noise_sigma": 0.597,
+      "eta": 0.0177
+    }
+  },
+  {
+    "n": 150,
+    "finished": 150,
+    "crashes": 0,
+    "avg_time": 22.079999999999618,
+    "best_time": 22.079999999999618,
+    "genome": {
+      "seed": 499492,
+      "noise_sigma": 0.538,
+      "eta": 0.0358
+    }
+  },
+  {
+    "n": 150,
+    "finished": 150,
+    "crashes": 0,
+    "avg_time": 26.92866666666618,
+    "best_time": 26.479999999999524,
+    "genome": {
+      "seed": 68711,
+      "noise_sigma": 0.663,
+      "eta": 0.0373
     }
   },
   {
@@ -54,9 +90,9 @@
     "avg_time": null,
     "best_time": null,
     "genome": {
-      "seed": 66172,
-      "noise_sigma": 0.453,
-      "eta": 0.0249
+      "seed": 243187,
+      "noise_sigma": 0.681,
+      "eta": 0.036
     }
   },
   {
@@ -66,9 +102,9 @@
     "avg_time": null,
     "best_time": null,
     "genome": {
-      "seed": 876363,
+      "seed": 548595,
       "noise_sigma": 0.534,
-      "eta": 0.0282
+      "eta": 0.0105
     }
   },
   {
@@ -78,9 +114,9 @@
     "avg_time": null,
     "best_time": null,
     "genome": {
-      "seed": 804423,
-      "noise_sigma": 0.301,
-      "eta": 0.0234
+      "seed": 619812,
+      "noise_sigma": 0.326,
+      "eta": 0.0334
     }
   },
   {
@@ -90,9 +126,69 @@
     "avg_time": null,
     "best_time": null,
     "genome": {
-      "seed": 756589,
-      "noise_sigma": 0.781,
-      "eta": 0.0277
+      "seed": 753741,
+      "noise_sigma": 0.852,
+      "eta": 0.0216
+    }
+  },
+  {
+    "n": 150,
+    "finished": 0,
+    "crashes": 0,
+    "avg_time": null,
+    "best_time": null,
+    "genome": {
+      "seed": 826392,
+      "noise_sigma": 0.853,
+      "eta": 0.0218
+    }
+  },
+  {
+    "n": 150,
+    "finished": 0,
+    "crashes": 0,
+    "avg_time": null,
+    "best_time": null,
+    "genome": {
+      "seed": 839813,
+      "noise_sigma": 0.646,
+      "eta": 0.0389
+    }
+  },
+  {
+    "n": 150,
+    "finished": 0,
+    "crashes": 4,
+    "avg_time": null,
+    "best_time": null,
+    "genome": {
+      "seed": 814989,
+      "noise_sigma": 0.338,
+      "eta": 0.0327
+    }
+  },
+  {
+    "n": 150,
+    "finished": 0,
+    "crashes": 150,
+    "avg_time": null,
+    "best_time": null,
+    "genome": {
+      "seed": 960437,
+      "noise_sigma": 0.662,
+      "eta": 0.0288
+    }
+  },
+  {
+    "n": 150,
+    "finished": 0,
+    "crashes": 150,
+    "avg_time": null,
+    "best_time": null,
+    "genome": {
+      "seed": 140665,
+      "noise_sigma": 0.827,
+      "eta": 0.0129
     }
   }
 ]

@@ -5,8 +5,8 @@
       "finished": 150,
       "crashes": 0,
       "timeouts": 0,
-      "avg_time": 15.036133333333101,
-      "best_time": 14.839999999999772
+      "avg_time": 10.292133333333203,
+      "best_time": 10.25999999999987
     },
     "baseline": {
       "n": 150,
@@ -23,8 +23,8 @@
       "finished": 150,
       "crashes": 0,
       "timeouts": 0,
-      "avg_time": 14.924133333333105,
-      "best_time": 14.859999999999772
+      "avg_time": 10.362266666666535,
+      "best_time": 10.339999999999868
     },
     "baseline": {
       "n": 150,
@@ -38,11 +38,11 @@
   "cold_greasy_track": {
     "fly": {
       "n": 150,
-      "finished": 149,
+      "finished": 150,
       "crashes": 0,
-      "timeouts": 1,
-      "avg_time": 18.36872483221446,
-      "best_time": 15.979999999999748
+      "timeouts": 0,
+      "avg_time": 12.925333333333146,
+      "best_time": 12.919999999999813
     },
     "baseline": {
       "n": 150,
@@ -59,8 +59,8 @@
       "finished": 150,
       "crashes": 0,
       "timeouts": 0,
-      "avg_time": 14.99199999999977,
-      "best_time": 14.659999999999776
+      "avg_time": 10.359466666666535,
+      "best_time": 10.119999999999873
     },
     "baseline": {
       "n": 150,
@@ -77,8 +77,8 @@
       "finished": 150,
       "crashes": 0,
       "timeouts": 0,
-      "avg_time": 17.196399999999723,
-      "best_time": 15.939999999999749
+      "avg_time": 12.731999999999818,
+      "best_time": 12.379999999999825
     },
     "baseline": {
       "n": 150,

@@ -267,3 +267,44 @@ trade worth making for that goal.
 - Values between 0.20 and 0.25, and above 0.25, to see whether there's a
   narrow threshold rather than a cliff.
 - A genuine multi-tick eligibility trace (still untried, see above).
+
+## 2026-09-18 — Found a genome that's both fast and fully robust
+
+**Context:** the compartmentalization fix (0.25) reliably fixes robustness
+but its population-selection winners have so far been slow (13.9-15.0s);
+lower fractions (0.15/0.20) reliably recover speed but reintroduce most of
+the crash rate on unseen scenarios. Ran another from-scratch population
+search at the same `lat_kc_fraction=0.25` (population 16, 4000 episodes,
+new seed) specifically looking for an individual that beats that trade-off
+rather than accepting it, since nothing about the architecture *requires*
+speed and robustness to trade off -- the fitness function used during
+selection only ever looks at the nominal scenario, so a genome that happens
+to be both was always possible, just not guaranteed to be found by any one
+run.
+
+**Result:** found one. Robustness scenario test, no retraining:
+
+| scenario | fly finish | fly crash | fly avg_time | baseline avg_time |
+|---|---|---|---|---|
+| nominal | 150/150 | 0 | 10.29s | 10.14s |
+| hot_engine | 150/150 | 0 | 10.36s | 10.02s |
+| cold_greasy_track | 150/150 | 0 | 12.93s | 12.74s |
+| patchy_grip | 150/150 | 0 | 10.36s | 10.46s |
+| worst_case | 150/150 | 0 | 12.73s | 12.74s |
+
+100% finish, 0 crashes, and within ~0.2s of the rule-based baseline on
+*every* scenario including the two that used to fail completely (0/150).
+This is now the committed `flypilot_brain.pkl`. Confirms the earlier
+tuning-section suspicion: fraction alone doesn't determine the outcome,
+genome variance at fixed fraction is large enough to span "matches
+baseline everywhere" to "crashes half the time on distribution shift" --
+so the practical lesson isn't "tune the fraction," it's "select on
+robustness, not just nominal performance, or population selection is
+gambling on which axis you happen to get."
+
+**Next candidates (not yet tried):**
+- Fold a robustness check (a handful of episodes on 1-2 held-out scenarios)
+  into `evolve.py`'s fitness function directly, so selection stops relying
+  on getting lucky and start actively searching for what this entry found
+  by chance.
+- A genuine multi-tick eligibility trace (still untried, see above).
