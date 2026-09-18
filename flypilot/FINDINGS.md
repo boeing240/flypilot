@@ -219,8 +219,51 @@ specifically. Worth tuning `lat_kc_fraction` and/or combining this with the
 TD baseline's individual results rather than picking one population run.
 
 **Next candidates (not yet tried):**
-- Tune `lat_kc_fraction` (currently 0.25) -- the lateral task (2 raw
-  features) may not need as much of the KC budget as it's currently given,
-  and reclaiming KCs for the longitudinal compartment might recover the
-  11.29s-level speed without reintroducing the cross-talk.
+- A genuine multi-tick eligibility trace (still untried, see above).
+
+## 2026-09-18 — Tuned `lat_kc_fraction`: speed and robustness don't trade off smoothly
+
+**Tried:** re-ran population selection (same population/episodes/seed as the
+compartmentalization result above) at `lat_kc_fraction` 0.20 and 0.15,
+giving the longitudinal compartment more of the 600-KC budget, to see if
+the 15.04s speed regression could be recovered without reintroducing the
+traction-loss failure.
+
+**Result:** speed came back sharply -- 0.20 found a best individual at
+10.11s, 0.15 at 10.02s, both matching the rule-based baseline's ~10.1s and
+beating the earlier TD-only 11.29s result, with 0 crashes in the nominal
+scenario. But robustness mostly collapsed back toward the pre-fix failure
+mode on both:
+
+| lat_kc_fraction | nominal | cold_greasy_track | patchy_grip | worst_case |
+|---|---|---|---|---|
+| 0.25 (compartmentalization result above) | 150/150, 0 crash | 149/150, 0 crash | 150/150, 0 crash | 150/150, 0 crash |
+| 0.20 | 150/150, 0 crash | 44/150, 106 crash | 122/150, 28 crash | 56/150, 94 crash |
+| 0.15 | 150/150, 0 crash | 39/150, 111 crash | 110/150, 40 crash | 51/150, 99 crash |
+
+Not a smooth trade-off curve -- 0.20 and 0.15 land in roughly the same
+(bad) place, while 0.25 is qualitatively different (near-perfect). Since the
+direct KC-overlap leak is structurally blocked at *any* fraction > 0 (a
+lateral KC's claws only ever sample the two curb-distance PN channels,
+regardless of how many lateral KCs there are), the remaining failure at low
+fractions is likely a capacity/redundancy problem instead: too few lateral
+KCs to represent curb-following robustly under distribution shift, not a
+wiring leak. Each fraction was also only tested via a single from-scratch
+population search (a different winning genome each time, and genome luck is
+already known to be high-variance here per the earlier robustness section),
+so this isn't a fully controlled sweep -- but the size of the gap between
+0.25 and 0.20 makes genome luck alone an unlikely full explanation.
+
+**Decision:** kept `lat_kc_fraction=0.25` as the default. The task this
+round was specifically fixing the traction-loss generalization failure, and
+0.25 is the only setting tested that actually fixes it; 10s-level speed at
+the cost of reintroducing 60-75% crash rates on unseen conditions is not a
+trade worth making for that goal.
+
+**Next candidates (not yet tried):**
+- A controlled sweep (same genome/seed, only `lat_kc_fraction` varying) to
+  separate "fraction effect" from "which genome the population search
+  happened to land on."
+- Values between 0.20 and 0.25, and above 0.25, to see whether there's a
+  narrow threshold rather than a cliff.
 - A genuine multi-tick eligibility trace (still untried, see above).

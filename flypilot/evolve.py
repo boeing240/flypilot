@@ -28,13 +28,17 @@ def genome_str(genome):
     return f"seed={genome['seed']}{extra}"
 
 
-def _train_and_evaluate(genome, train_episodes, eval_episodes):
+def _train_and_evaluate(genome, train_episodes, eval_episodes, lat_kc_fraction):
     # Runs in a worker process: builds its own env/encoder, so nothing is
     # shared with the parent or with sibling workers.
     brain = train(
         n_episodes=train_episodes,
         seed0=genome["seed"],
-        brain_kwargs={"noise_sigma": genome["noise_sigma"], "eta": genome["eta"]},
+        brain_kwargs={
+            "noise_sigma": genome["noise_sigma"],
+            "eta": genome["eta"],
+            "lat_kc_fraction": lat_kc_fraction,
+        },
         quiet=True,
     )
     env = DragStripEnv()
@@ -96,6 +100,10 @@ def main():
                           "0 disables checkpointing)")
     ap.add_argument("--checkpoint-episodes", type=int, default=30,
                      help="episodes used for each checkpoint evaluation")
+    ap.add_argument("--lat-kc-fraction", type=float, default=0.25,
+                     help="fraction of the KC population wired to the lateral "
+                          "(steering) compartment (only used for fresh individuals, "
+                          "not --continue-from, since KC wiring is fixed at brain init)")
     args = ap.parse_args()
 
     rng = random.Random(args.seed)
@@ -129,7 +137,8 @@ def main():
             }
         else:
             futures = {
-                pool.submit(_train_and_evaluate, genome, args.train_episodes, args.eval_episodes): i
+                pool.submit(_train_and_evaluate, genome, args.train_episodes,
+                            args.eval_episodes, args.lat_kc_fraction): i
                 for i, genome in enumerate(genomes)
             }
         for future in futures:
