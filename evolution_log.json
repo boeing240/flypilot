@@ -81,5 +81,12 @@
     "avg_time_nominal": 10.29,
     "all_scenarios_finish_rate": "150/150",
     "all_scenarios_crashes": 0
+  },
+  {
+    "milestone": "ran 11 more from-scratch population searches (seeds 4-14) screening each winner against all 5 robustness scenarios before promoting",
+    "note": "most candidates were either slower than the incumbent or had crashes on cold_greasy_track/worst_case/patchy_grip -- rejected without touching the committed brain. seed=663463 (from seed=14 population) matched or beat the incumbent on 4/5 scenarios while keeping 0 crashes everywhere: nominal 10.20s, hot_engine 10.16s, cold_greasy_track 13.04s, patchy_grip 10.31s, worst_case 12.65s (vs incumbents 10.29/10.36/12.93/10.36/12.73). Promoted.",
+    "kept_as_best": true,
+    "all_scenarios_finish_rate": "150/150",
+    "all_scenarios_crashes": 0
   }
 ]

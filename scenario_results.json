@@ -5,8 +5,8 @@
       "finished": 150,
       "crashes": 0,
       "timeouts": 0,
-      "avg_time": 10.292133333333203,
-      "best_time": 10.25999999999987
+      "avg_time": 10.199999999999871,
+      "best_time": 10.179999999999872
     },
     "baseline": {
       "n": 150,
@@ -23,8 +23,8 @@
       "finished": 150,
       "crashes": 0,
       "timeouts": 0,
-      "avg_time": 10.362266666666535,
-      "best_time": 10.339999999999868
+      "avg_time": 10.159999999999872,
+      "best_time": 10.159999999999872
     },
     "baseline": {
       "n": 150,
@@ -41,8 +41,8 @@
       "finished": 150,
       "crashes": 0,
       "timeouts": 0,
-      "avg_time": 12.925333333333146,
-      "best_time": 12.919999999999813
+      "avg_time": 13.039466666666478,
+      "best_time": 13.019999999999811
     },
     "baseline": {
       "n": 150,
@@ -59,7 +59,7 @@
       "finished": 150,
       "crashes": 0,
       "timeouts": 0,
-      "avg_time": 10.359466666666535,
+      "avg_time": 10.309333333333202,
       "best_time": 10.119999999999873
     },
     "baseline": {
@@ -77,8 +77,8 @@
       "finished": 150,
       "crashes": 0,
       "timeouts": 0,
-      "avg_time": 12.731999999999818,
-      "best_time": 12.379999999999825
+      "avg_time": 12.65279999999982,
+      "best_time": 12.359999999999825
     },
     "baseline": {
       "n": 150,
