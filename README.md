@@ -13,46 +13,50 @@ what worked, what didn't, and why.
   sensors, slip-induced lateral pull, uncertainty knobs (engine derate,
   traction loss/jitter).
 - `flypilot/sense.py` — sensor -> projection-neuron encoding.
-- `flypilot/brain.py` — the mushroom-body-inspired controller (KC layer,
-  MBON pools, node-perturbation plasticity, compartmentalized dopamine).
-- `flypilot/learning.py` — dopamine as reward-prediction-error.
+- `flypilot/brain.py` — the mushroom-body-inspired controller (KC layer split
+  into lateral/longitudinal compartments, MBON pools, node-perturbation
+  plasticity).
+- `flypilot/learning.py` — dopamine as reward-prediction error (scalar baseline
+  for steering, TD(0) value baseline for throttle/shift).
 - `flypilot/baseline.py` — hand-tuned rule-based controller, for comparison.
-- `flypilot/train.py` — single-brain training loop.
+- `flypilot/train.py` — training loop (optionally with domain randomization)
+  and the shared evaluation helpers.
 - `flypilot/evolve.py` — population selection: train N individuals (varied
-  seed / exploration noise / learning rate), evaluate, keep the best.
+  seed / exploration noise / learning rate), evaluate, keep the best; can also
+  score them on held-out scenarios during selection.
 - `flypilot/scenarios.py`, `flypilot/evaluate_scenarios.py` — robustness
   testing across uncertainty scenarios without retraining.
-- `flypilot/replay.py` — records a per-tick trace for the visualizer.
-- `viz/index.html` — the visualization (published as a Claude Artifact);
-  reads `replays.json` / `scenario_results.json`.
+- `flypilot/evaluate.py` — train one fly from scratch and compare it against
+  the baseline.
+- `models/` — the deployed brain (`flypilot_brain.pkl`).
+- `results/` — its scenario results, the leaderboard of the run that produced
+  it, and `evolution_log.json` (what each search round found).
+- `runs/` — per-run output of `evolve.py` (`log.txt`, `leaderboard.json`,
+  `best.pkl`); git-ignored.
 
 ## Status (see FINDINGS.md for the full log)
 
-Steering is solid — the dense centering reward gets 0 crashes even under
-added slip-induced lateral pull. Throttle/shift is still a work in progress:
-reward shaping keeps uncovering new equilibria (redline-forever in 1st gear,
-instant-upshift-to-dodge-slip-penalty, near-zero-throttle-to-avoid-all-risk)
-faster than hand-tuned coefficients can chase them down. Was mid-way through
-switching from manual coefficient tuning to population selection
-(`evolve.py`) when this was paused — that's the next thing to pick up.
+The deployed brain finishes 150/150 with 0 crashes on every scenario
+(nominal, hot engine, cold greasy track, patchy grip, worst case), within
+~0.2s of the rule-based baseline on each. Finding such an individual is
+luck-heavy — roughly one in 15-30 population winners is both fast and fully
+robust — so selection can now score robustness directly (`--robust-scenarios`)
+and training can randomize conditions (`--randomize-prob`).
 
 ## Quickstart
 
 ```bash
 pip install -r requirements.txt
 
-# train one brain
-python -c "from flypilot.train import train; import pickle; b=train(n_episodes=5000); pickle.dump(b, open('flypilot_brain.pkl','wb'))"
-
-# or run population selection instead of hand-tuning reward coefficients
-python -m flypilot.evolve --population 8 --train-episodes 4000 --eval-episodes 150
+# population selection; output goes to runs/<run-name>/
+python -m flypilot.evolve --population 16 --train-episodes 4000 --eval-episodes 150 \
+    --robust-scenarios cold_greasy_track worst_case --run-name my-run
 
 # robustness across uncertainty scenarios (engine derate, traction loss/jitter)
-python -m flypilot.evaluate_scenarios --episodes 150
+python -m flypilot.evaluate_scenarios --brain runs/my-run/best.pkl --out runs/my-run/scenario_results.json
 ```
 
 Run from the repo root (not inside `flypilot/`) so the `flypilot.*` module
-imports resolve.
-
-Then open `viz/index.html` (with `replays.json` / `scenario_results.json`
-next to it, or served via `python -m http.server`) to watch it drive.
+imports resolve. Promote a run's `best.pkl` by copying it to
+`models/flypilot_brain.pkl` and rerunning `evaluate_scenarios` with its
+default paths.

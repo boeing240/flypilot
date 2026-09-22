@@ -31,9 +31,6 @@ class DopamineTracker:
         self.alpha = alpha
         self.baseline = 0.0
 
-    def reset_baseline(self):
-        self.baseline = 0.0
-
     def step(self, reward: float, features=None, next_features=None) -> float:
         # features/next_features accepted (and ignored) so callers can treat
         # both tracker types uniformly.
@@ -64,9 +61,6 @@ class ValueDopamineTracker:
         # damage that does to both the brain's plasticity update and V's own
         # bootstrapped update.
         self.delta_clip = delta_clip
-
-    def reset_baseline(self):
-        self.w[:] = 0.0
 
     def value(self, features: np.ndarray) -> float:
         return float(self.w @ features)

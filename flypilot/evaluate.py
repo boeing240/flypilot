@@ -4,7 +4,6 @@ import argparse
 import statistics as stats
 
 from .baseline import BaselineController
-from .brain import FlyBrain
 from .env import DragStripEnv
 from .learning import DopamineTracker, ValueDopamineTracker
 from .sense import N_PN, SenseEncoder

@@ -2,3 +2,6 @@ __pycache__/
 *.pyc
 .venv/
 *.egg-info/
+
+# experiment output (logs, leaderboards, candidate brains); results/ and models/ are tracked
+runs/

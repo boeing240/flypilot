@@ -10,10 +10,13 @@ from __future__ import annotations
 
 import argparse
 import copy
+import datetime
 import json
 import os
+import pathlib
 import pickle
 import random
+import sys
 from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
@@ -22,6 +25,22 @@ from .env import DragStripEnv
 from .scenarios import SCENARIOS
 from .sense import SenseEncoder
 from .train import continue_train, evaluate, fitness_key, train
+
+
+class _Tee:
+    """Mirrors stdout into the run's log file, flushing so it can be followed live."""
+
+    def __init__(self, *streams):
+        self.streams = streams
+
+    def write(self, text):
+        for s in self.streams:
+            s.write(text)
+            s.flush()
+
+    def flush(self):
+        for s in self.streams:
+            s.flush()
 
 
 def genome_str(genome):
@@ -68,7 +87,7 @@ def selection_key(summary):
 
 
 def _train_and_evaluate(genome, train_episodes, eval_episodes, lat_kc_fraction,
-                         robust_scenarios=(), robust_episodes=50):
+                         robust_scenarios=(), robust_episodes=50, randomize_prob=0.0):
     # Runs in a worker process: builds its own env/encoder, so nothing is
     # shared with the parent or with sibling workers.
     brain = train(
@@ -80,6 +99,7 @@ def _train_and_evaluate(genome, train_episodes, eval_episodes, lat_kc_fraction,
             "lat_kc_fraction": lat_kc_fraction,
         },
         quiet=True,
+        randomize_prob=randomize_prob,
     )
     env = DragStripEnv()
     encoder = SenseEncoder()
@@ -121,8 +141,9 @@ def main():
     ap.add_argument("--population", type=int, default=8)
     ap.add_argument("--train-episodes", type=int, default=3000)
     ap.add_argument("--eval-episodes", type=int, default=150)
-    ap.add_argument("--out", default="flypilot_brain.pkl")
-    ap.add_argument("--leaderboard-out", default="evolve_leaderboard.json")
+    ap.add_argument("--run-name", default=None,
+                     help="output goes to runs/<run-name>/ (log.txt, leaderboard.json, "
+                          "best.pkl); default is a timestamp")
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--workers", type=int, default=os.cpu_count(),
                      help="parallel worker processes (default: all cores)")
@@ -156,11 +177,20 @@ def main():
                           "winners must survive them, not just nominal")
     ap.add_argument("--robust-episodes", type=int, default=50,
                      help="episodes per robustness scenario")
+    ap.add_argument("--randomize-prob", type=float, default=0.0,
+                     help="fraction of training episodes run under randomly drawn "
+                          "traction/engine conditions (domain randomization); the "
+                          "ranges cover the named scenarios, so they are no longer "
+                          "held-out (fresh individuals only)")
     ap.add_argument("--lat-kc-fraction", type=float, default=0.25,
                      help="fraction of the KC population wired to the lateral "
                           "(steering) compartment (only used for fresh individuals, "
                           "not --continue-from, since KC wiring is fixed at brain init)")
     args = ap.parse_args()
+
+    run_dir = pathlib.Path("runs") / (args.run_name or datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+    run_dir.mkdir(parents=True, exist_ok=True)
+    sys.stdout = _Tee(sys.stdout, open(run_dir / "log.txt", "w", encoding="utf-8"))
 
     rng = random.Random(args.seed)
     parent_brain = None
@@ -195,7 +225,8 @@ def main():
             futures = {
                 pool.submit(_train_and_evaluate, genome, args.train_episodes,
                             args.eval_episodes, args.lat_kc_fraction,
-                            tuple(args.robust_scenarios), args.robust_episodes): i
+                            tuple(args.robust_scenarios), args.robust_episodes,
+                            args.randomize_prob): i
                 for i, genome in enumerate(genomes)
             }
         for future in futures:
@@ -214,11 +245,11 @@ def main():
         table.append({k: v for k, v in summary.items()})
 
     best_summary, best_brain = leaderboard[0]
-    with open(args.out, "wb") as f:
+    with open(run_dir / "best.pkl", "wb") as f:
         pickle.dump(best_brain, f)
-    with open(args.leaderboard_out, "w") as f:
+    with open(run_dir / "leaderboard.json", "w") as f:
         json.dump(table, f, indent=2)
-    print(f"\nwrote {args.out} (best individual) and {args.leaderboard_out}")
+    print(f"\nwrote {run_dir}/best.pkl (best individual), leaderboard.json and log.txt")
 
 
 if __name__ == "__main__":

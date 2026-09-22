@@ -6,12 +6,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import pathlib
 import pickle
 import statistics as stats
 
 from .baseline import BaselineController
 from .env import DragStripEnv
-from .replay import record_baseline_episode, record_fly_episode
 from .scenarios import SCENARIOS
 from .sense import N_PN, SenseEncoder
 from .train import run_baseline_episode, run_fly_episode
@@ -50,10 +50,9 @@ def eval_scenario(name, kwargs, brain, baseline, n_episodes, seed0):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--brain", default="flypilot_brain.pkl")
+    ap.add_argument("--brain", default="models/flypilot_brain.pkl")
     ap.add_argument("--episodes", type=int, default=150)
-    ap.add_argument("--out", default="scenario_results.json")
-    ap.add_argument("--replay-out", default="replays.json")
+    ap.add_argument("--out", default="results/scenario_results.json")
     args = ap.parse_args()
 
     with open(args.brain, "rb") as f:
@@ -61,7 +60,6 @@ def main():
     baseline = BaselineController()
 
     all_stats = {}
-    replays = {}
     for name, kwargs in SCENARIOS.items():
         print(f"=== scenario: {name} ===")
         result = eval_scenario(name, kwargs, brain, baseline, args.episodes, seed0=20000)
@@ -77,19 +75,11 @@ def main():
             f"avg_time {result['baseline']['avg_time']}"
         )
 
-        # one representative replay per driver, fixed seed so scenarios are comparable
-        env_fly = DragStripEnv(**kwargs)
-        encoder = SenseEncoder()
-        fly_replay = record_fly_episode(env_fly, brain, encoder, seed=99001, env_kwargs=None)
-        env_base = DragStripEnv(**kwargs)
-        base_replay = record_baseline_episode(env_base, baseline, seed=99001, env_kwargs=None)
-        replays[name] = {"fly": fly_replay, "baseline": base_replay}
-
-    with open(args.out, "w") as f:
+    out_path = pathlib.Path(args.out)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, "w") as f:
         json.dump(all_stats, f, indent=2)
-    with open(args.replay_out, "w") as f:
-        json.dump(replays, f)
-    print(f"\nwrote {args.out} and {args.replay_out}")
+    print(f"\nwrote {out_path}")
 
 
 if __name__ == "__main__":

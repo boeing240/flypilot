@@ -106,11 +106,9 @@ class FlyBrain:
         self.w_max = 3.0
         self.reflex_gain = 3.0
         self.shift_threshold = 0.5
-        self._last_kc = np.zeros(n_kc)
 
     def reset(self):
         self.eligibility[:] = 0.0
-        self._last_kc[:] = 0.0
 
     def forward(self, pn: np.ndarray, green_trace: float, explore: bool = True) -> dict:
         gathered = pn[self.claw_idx]  # (n_kc, n_claws)
@@ -139,7 +137,6 @@ class FlyBrain:
             # *previous* tick's noise sample is pure variance, not signal, since
             # each forward() call draws an independent perturbation.
             self.eligibility = np.outer(noise, kc)
-        self._last_kc = kc
 
         return {"throttle": float(throttle), "steer": steer, "shift": shift_flag}
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import random
 import statistics as stats
 
 from .brain import FlyBrain
@@ -104,17 +105,37 @@ def run_baseline_episode(env: DragStripEnv, controller, seed: int) -> dict:
     }
 
 
+# Ranges sampled per training episode when domain randomization is on. They
+# deliberately span the named scenarios in scenarios.py (traction 0.65,
+# engine 0.75, jitter 0.35), so those scenarios stop being out-of-distribution
+# once randomization is used.
+CONDITION_RANGES = {
+    "traction_scale": (0.6, 1.0),
+    "engine_power_scale": (0.7, 1.0),
+    "traction_noise_sigma": (0.0, 0.4),
+}
+NOMINAL_CONDITIONS = {"traction_scale": 1.0, "engine_power_scale": 1.0, "traction_noise_sigma": 0.0}
+
+
+def set_conditions(env: DragStripEnv, conditions: dict) -> None:
+    for name, value in conditions.items():
+        setattr(env, name, value)
+
+
 def train(n_episodes: int = 3000, report_every: int = 200, seed0: int = 0,
-          brain_kwargs: dict | None = None, quiet: bool = False) -> FlyBrain:
+          brain_kwargs: dict | None = None, quiet: bool = False,
+          randomize_prob: float = 0.0) -> FlyBrain:
     brain = FlyBrain(n_pn=N_PN, seed=seed0, **(brain_kwargs or {}))
-    return continue_train(brain, n_episodes, report_every=report_every, seed0=seed0, quiet=quiet)
+    return continue_train(brain, n_episodes, report_every=report_every, seed0=seed0,
+                          quiet=quiet, randomize_prob=randomize_prob)
 
 
 def continue_train(brain: FlyBrain, n_episodes: int, report_every: int = 200,
                     seed0: int = 0, quiet: bool = False,
                     checkpoint_every: int | None = None,
                     checkpoint_episodes: int = 30,
-                    checkpoint_seed0: int = 500_000) -> FlyBrain:
+                    checkpoint_seed0: int = 500_000,
+                    randomize_prob: float = 0.0) -> FlyBrain:
     """Keeps training an already-initialized brain (e.g. a clone of a winner
     from a previous selection round) instead of starting from scratch.
 
@@ -124,11 +145,16 @@ def continue_train(brain: FlyBrain, n_episodes: int, report_every: int = 200,
     improve it. If `checkpoint_every` is set, the brain is periodically
     frozen and evaluated on a small held-out set, and the *best* checkpoint
     seen is returned instead of just whatever the final episode left behind.
+
+    With `randomize_prob` > 0, that fraction of training episodes runs under
+    randomly drawn traction/engine conditions (CONDITION_RANGES) instead of
+    nominal, so robustness to them is trained for rather than found by luck.
     """
     env = DragStripEnv()
     encoder = SenseEncoder()
     dopamine_lon = ValueDopamineTracker(N_PN)
     dopamine_lat = DopamineTracker()
+    condition_rng = random.Random(seed0)
 
     best_brain = None
     best_fitness = None
@@ -137,6 +163,9 @@ def continue_train(brain: FlyBrain, n_episodes: int, report_every: int = 200,
         nonlocal best_brain, best_fitness
         if checkpoint_every is None:
             return
+        # checkpoints are scored at nominal, not at whatever the last training
+        # episode happened to randomize the shared env to
+        set_conditions(env, NOMINAL_CONDITIONS)
         summary = evaluate(brain, env, encoder, checkpoint_episodes, seed0=checkpoint_seed0)
         fit = fitness_key(summary)
         if best_fitness is None or fit < best_fitness:
@@ -145,6 +174,11 @@ def continue_train(brain: FlyBrain, n_episodes: int, report_every: int = 200,
 
     window = []
     for ep in range(n_episodes):
+        if randomize_prob > 0.0 and condition_rng.random() < randomize_prob:
+            set_conditions(env, {n: condition_rng.uniform(lo, hi)
+                                 for n, (lo, hi) in CONDITION_RANGES.items()})
+        else:
+            set_conditions(env, NOMINAL_CONDITIONS)
         result = run_fly_episode(
             env, brain, encoder, dopamine_lon, dopamine_lat, seed=seed0 + ep, learn=True
         )
