@@ -111,7 +111,8 @@ def _train_and_evaluate(genome, train_episodes, eval_episodes, lat_kc_fraction,
 
 
 def _continue_and_evaluate(parent_brain, genome, train_episodes, eval_episodes,
-                            finetune_scale, checkpoint_every, checkpoint_episodes):
+                            finetune_scale, checkpoint_every, checkpoint_episodes,
+                            robust_scenarios=(), robust_episodes=50, randomize_prob=0.0):
     # Clone the parent's learned weights, but reseed the clone's own RNG --
     # otherwise every clone would draw the exact same exploration noise as
     # its siblings (same weights + same rng state = identical trajectory)
@@ -128,10 +129,13 @@ def _continue_and_evaluate(parent_brain, genome, train_episodes, eval_episodes,
     brain = continue_train(
         brain, train_episodes, seed0=genome["seed"], quiet=True,
         checkpoint_every=checkpoint_every, checkpoint_episodes=checkpoint_episodes,
+        randomize_prob=randomize_prob,
     )
     env = DragStripEnv()
     encoder = SenseEncoder()
     summary = evaluate(brain, env, encoder, eval_episodes, seed0=90_000)
+    if robust_scenarios:
+        summary["robust"] = evaluate_robustness(brain, robust_scenarios, robust_episodes)
     summary["genome"] = genome
     return summary, brain
 
@@ -218,7 +222,9 @@ def main():
             futures = {
                 pool.submit(_continue_and_evaluate, parent_brain, genome,
                             args.train_episodes, args.eval_episodes,
-                            args.finetune_scale, checkpoint_every, args.checkpoint_episodes): i
+                            args.finetune_scale, checkpoint_every, args.checkpoint_episodes,
+                            tuple(args.robust_scenarios), args.robust_episodes,
+                            args.randomize_prob): i
                 for i, genome in enumerate(genomes)
             }
         else:
