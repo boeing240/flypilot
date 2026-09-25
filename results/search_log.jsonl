@@ -10,3 +10,4 @@
 {"round": 10, "run_name": "search-0010-fresh-1009", "seed": 1009, "mode": "fresh", "crashes": 0, "total_time": 60.71119999999915, "champion_total_time_before": 56.36159999999924, "promoted": false}
 {"round": 11, "run_name": "search-0011-ft-1010", "seed": 1010, "mode": "finetune", "crashes": 0, "total_time": 67.76986666666568, "champion_total_time_before": 56.36159999999924, "promoted": false}
 {"round": 12, "run_name": "search-0012-fresh-1011", "seed": 1011, "mode": "fresh", "crashes": 0, "total_time": 59.90146666666583, "champion_total_time_before": 56.36159999999924, "promoted": false}
+{"round": 13, "run_name": "search-0013-ft-1012", "seed": 1012, "mode": "finetune", "crashes": 0, "total_time": 65.44053333333238, "champion_total_time_before": 56.36159999999924, "promoted": false}
