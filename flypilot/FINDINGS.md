@@ -308,3 +308,65 @@ gambling on which axis you happen to get."
   on getting lucky and start actively searching for what this entry found
   by chance.
 - A genuine multi-tick eligibility trace (still untried, see above).
+
+## 2026-09-26 — First automated `search.py` run: 31 rounds, champion unbeaten
+
+**Context:** manual round-by-round search (launch, wait, check, decide) had
+become the bottleneck, and background-task interruptions during long manual
+sessions had twice caused a round's results to be silently lost. Wrote
+`flypilot/search.py` (see its module docstring) to automate the whole loop:
+alternate fresh/fine-tune rounds, full-verify every round's winner on all 5
+scenarios via `evaluate_scenarios.py` (never trust the pooled screen alone,
+see the compartmentalization-tuning entries above), and commit+push after
+every single round so nothing is lost to an interruption again. Ran it for
+30 rounds (population 16, 4000 train episodes, 150 eval episodes each) on
+top of the reigning champion from the entry above.
+
+**Result:** the champion was never beaten. 31/31 rounds rejected (including
+one earlier smoke-test round). Breakdown: 16 fresh, 15 fine-tune; 28 of 31
+winners finished 100% with zero pooled-screen crashes, yet only 1 round
+(#19, finetune) even came within 2 crashes of promotion on the *full*
+verify -- every other zero-crash winner was rejected purely on total_time
+being worse than the champion's 56.36s. The five closest attempts:
+
+| round | mode | total_time | vs champion |
+|---|---|---|---|
+| 3 | finetune | 57.99s | +1.63s |
+| 5 | finetune | 58.04s | +1.68s |
+| 4 | fresh | 59.30s | +2.94s |
+| 12 | fresh | 59.90s | +3.54s |
+| 8 | fresh | 60.61s | +4.25s |
+
+The dominant failure pattern, repeated in roughly two-thirds of zero-crash
+rounds: a winner matches or slightly beats the champion's *nominal* time
+(sometimes by a lot -- round 25's winner ran nominal in 9.95s, faster than
+the champion's 10.20s) while scoring a perfect pooled-robustness screen
+(100/100, 0 crashes on cold_greasy_track + worst_case combined), only to
+blow up specifically on `worst_case` when checked individually at full
+150-episode resolution -- times as high as 18-22s versus the champion's
+12.65s, with `patchy_grip` the next most common casualty. This is the same
+pooled-screen-vs-full-verify gap documented in the compartmentalization
+entries, now confirmed at much larger sample size (31 independent
+populations): a genome can be trained to survive `worst_case` and
+`cold_greasy_track` *pooled* without actually being fast or robust on
+`worst_case` *specifically* -- the pool lets a bad worst_case be offset by
+a good cold_greasy_track in the same 100-episode count. `search.py`'s
+per-scenario full verify is what catches this; the pooled screen used
+during in-loop selection would have promoted several of these.
+
+A secondary, rarer failure mode (round 19, round 7): a genome finishes
+150/150 with 0 pooled crashes across 100 held-out episodes, then produces
+1-2 crashes each on cold_greasy_track/worst_case once actually run at
+150 episodes per scenario individually -- not a speed problem, a sample-size
+one: 50-episode pooled screens are too small to reliably surface a low
+crash *rate* that would clearly show up at 150.
+
+**Conclusion:** the champion from 2026-09-18 is more robust than any of the
+31 population searches/fine-tunes tried since, specifically because it
+doesn't have a slow tail on worst_case -- a property invisible to the
+pooled screen and only checkable by the full per-scenario verify this
+script now automates. Next: run another 30-round batch from the same
+champion; if it survives another full batch, worth considering whether
+`--robust-scenarios` should score `worst_case` on its own line (not pooled
+with cold_greasy_track) precisely to make this failure visible during
+selection, not just after.
