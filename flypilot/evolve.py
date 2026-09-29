@@ -54,36 +54,49 @@ def summary_str(summary):
     out = f"finished {finish_rate}%  crashes {summary['crashes']}/{summary['n']}  avg_time {t}"
     rob = summary.get("robust")
     if rob:
-        out += f"  | robust finished {rob['finished']}/{rob['n']} crashes {rob['crashes']}"
+        rt = f"{rob['avg_time']:.2f}s" if rob["avg_time"] else "-"
+        out += f"  | robust finished {rob['finished']}/{rob['n']} crashes {rob['crashes']} avg_time {rt}"
     return out
 
 
 def evaluate_robustness(brain, scenario_names, n_episodes, seed0=95_000):
-    """Pooled finish/crash counts across held-out scenarios (never trained on).
-    seed0 differs from both the nominal selection eval (90_000) and
-    evaluate_scenarios.py (20_000), so a winner isn't screened on the same
-    episodes it will later be verified on."""
+    """Pooled finish/crash/time counts across held-out scenarios (never
+    trained on). seed0 differs from both the nominal selection eval (90_000)
+    and evaluate_scenarios.py (20_000), so a winner isn't screened on the
+    same episodes it will later be verified on."""
     encoder = SenseEncoder()
     total = {"n": 0, "finished": 0, "crashes": 0}
+    time_sum = 0.0
     for name in scenario_names:
         s = evaluate(brain, DragStripEnv(**SCENARIOS[name]), encoder, n_episodes, seed0=seed0)
         for k in total:
             total[k] += s[k]
+        if s["avg_time"] is not None:
+            time_sum += s["avg_time"] * s["finished"]
+    total["avg_time"] = time_sum / total["finished"] if total["finished"] else None
     return total
 
 
 def selection_key(summary):
-    # With robustness scores present, pool them with the nominal eval so an
-    # individual that only works at nominal can't outrank one that also
-    # survives the held-out scenarios; nominal avg_time is still the tiebreak.
+    # With robustness scores present, pool finish/crash rate with the nominal
+    # eval so an individual that only works at nominal can't outrank one that
+    # also survives the held-out scenarios. Speed is nominal avg_time PLUS
+    # the held-out scenarios' pooled avg_time -- using nominal time alone let
+    # 61 straight search.py rounds select for "survives cold_greasy_track/
+    # worst_case" while staying completely blind to how slow it was doing
+    # so, which is exactly the failure mode that rejected every one of them
+    # at full-verify time (see FINDINGS.md). This aligns in-loop selection
+    # with the actual promotion criterion.
     rob = summary.get("robust")
     if rob is None:
         return fitness_key(summary)
     n = summary["n"] + rob["n"]
     finish_rate = (summary["finished"] + rob["finished"]) / n
     crash_rate = (summary["crashes"] + rob["crashes"]) / n
-    avg_time = summary["avg_time"] if summary["avg_time"] is not None else 1e9
-    return (-finish_rate, crash_rate, avg_time)
+    nominal_time = summary["avg_time"] if summary["avg_time"] is not None else 1e9
+    robust_time = rob["avg_time"] if rob["avg_time"] is not None else 1e9
+    combined_time = nominal_time + robust_time
+    return (-finish_rate, crash_rate, combined_time)
 
 
 def _train_and_evaluate(genome, train_episodes, eval_episodes, lat_kc_fraction,
