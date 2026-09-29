@@ -370,3 +370,48 @@ champion; if it survives another full batch, worth considering whether
 `--robust-scenarios` should score `worst_case` on its own line (not pooled
 with cold_greasy_track) precisely to make this failure visible during
 selection, not just after.
+
+## 2026-09-27 — Second automated `search.py` batch (rounds 32-61): champion still unbeaten
+
+**Context:** ran a second 30-round `search.py` batch (population 16, 4000
+train episodes, 150 eval episodes) immediately after the first, same
+champion, same settings, to see whether the first batch's result (champion
+survives 31/31 rounds) was representative or a lucky streak.
+
+**Result:** champion unbeaten again. All 30 rounds rejected (15 fresh, 15
+fine-tune) -- and this batch was actually *cleaner* than the first: every
+single one of the 30 winners finished with zero crashes (batch 1 had one
+crashing winner among 31), so every rejection here came down purely to
+`total_time` losing to the champion's 56.36s. The five closest attempts:
+
+| round | mode | total_time | vs champion |
+|---|---|---|---|
+| 32 | fresh | 56.58s | +0.22s |
+| 45 | finetune | 57.78s | +1.42s |
+| 46 | fresh | 57.81s | +1.45s |
+| 61 | finetune | 57.91s | +1.55s |
+| 57 | finetune | 58.29s | +1.93s |
+
+Round 32 is the closest call across both batches so far (31 + 30 = 61
+rounds total) -- only 0.22s behind, and it was a *fresh* individual, not a
+fine-tune of the champion. The dominant failure pattern from the first
+batch repeats exactly: several winners matched or beat the champion's
+*nominal* time (round 51's fine-tune ran nominal in 9.96s; round 39's did
+9.94s) while scoring perfect pooled-robustness screens, only to blow up on
+`worst_case` specifically once checked individually -- as high as 24.91s
+(round 51) and 22.04s (round 39) versus the champion's 12.65s. `patchy_grip`
+was the second most common casualty, occasionally by itself (round 12 in
+the first batch effectively repeats here at round 45: nominal 10.24s but
+patchy_grip 20.15s / worst_case 24.91s in round 51).
+
+**Conclusion:** across 61 independent rounds (~1000 trained individuals)
+spanning two batches, nothing has beaten the 2026-09-18 champion, and the
+closest miss is 0.22s. This is now strong evidence the champion sits at or
+very near a local optimum for this reward/architecture combination -- not
+just lucky. The `worst_case`-blowup failure mode is the single most
+reliable predictor of rejection and appeared in a majority of zero-crash
+losers across both batches; the earlier suggestion to score `worst_case` on
+its own line in `--robust-scenarios` (rather than pooled with
+cold_greasy_track) remains the most promising next lever if further
+searching is wanted, since the pooled screen still can't see this failure
+mode before promotion time.
