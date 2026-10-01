@@ -415,3 +415,67 @@ its own line in `--robust-scenarios` (rather than pooled with
 cold_greasy_track) remains the most promising next lever if further
 searching is wanted, since the pooled screen still can't see this failure
 mode before promotion time.
+
+## 2026-10-01 — Fixed the selection blind spot; third `search.py` batch (rounds 62-91): champion still unbeaten, but the failure pattern changed
+
+**Context:** the previous entry's suggested next lever turned out to be a
+real bug, not just a tuning knob. `evolve.py`'s `selection_key()` pooled the
+held-out scenarios' finish/crash rate into the ranking, but never their
+*speed* -- the sort key's time component was nominal `avg_time` alone, even
+though both prior batches' dominant rejection reason was a winner that was
+fast at nominal while being catastrophically slow on `worst_case`
+specifically. In other words, 61 rounds of search had been explicitly
+optimizing for "survives distribution shift" while being structurally blind
+to "survives it quickly" -- exactly the property that sank nearly every
+zero-crash candidate at full-verify time. Fixed by having
+`evaluate_robustness()` also accumulate a pooled `avg_time` across the
+held-out scenarios, and `selection_key()` rank by `nominal_time +
+robust_time` combined (commit `4d2d1c4`). Ran a third 30-round batch
+(population 16, 4000 train episodes, 150 eval episodes) on the same
+champion, using the corrected selection function throughout, specifically
+to see whether this changes *how* candidates fail, not just whether they
+beat the champion.
+
+**Result:** champion unbeaten a third time -- 91 rounds total across three
+batches, 0 promotions. But the failure pattern is qualitatively different
+from both prior batches. Not one of the 30 rounds in this batch produced
+the old signature (fast nominal, perfect pooled robustness screen, then an
+18-22s+ blowup on `worst_case` alone at full verify). Instead, every
+rejection fell into one of: a clean, uniformly-slower-everywhere miss (most
+common), a globally slow fresh individual (rounds 66, 72, 84, all ~118s
+total -- a bad random init, not a selection failure), a moderate (not
+extreme) `worst_case`/`patchy_grip` elevation to ~17-18s rather than
+20-27s (rounds 68, 76, 78, 82), or a rare promotion-blocking crash (rounds
+62, 71). The five closest clean misses:
+
+| round | mode | total_time | vs champion |
+|---|---|---|---|
+| 87 | finetune | 57.52s | +1.16s |
+| 81 | finetune | 57.79s | +1.43s |
+| 75 | finetune | 58.01s | +1.65s |
+| 91 | finetune | 58.29s | +1.93s |
+| 89 | finetune | 58.36s | +2.00s |
+
+Two things stand out against the prior two batches. First, the closest
+misses *tightened* as the batch went on (58.01s at round 75, 57.79s at
+round 81, 57.52s at round 87) rather than clustering at one lucky round --
+weak evidence the fine-tune line is actually converging toward the
+champion's neighborhood, not just re-sampling noise. Second, every one of
+these close misses is a clean, uniform near-match across all five
+scenarios (e.g. round 87: nominal 10.42s vs champion 10.14s, worst_case
+13.05s vs 12.74s) rather than a fast-but-fragile genome that would have
+blown up under the old selection. That is precisely the failure mode the
+fix was meant to produce: a genuinely competitive-but-slightly-slower
+candidate, not a landmine the old pooled screen would have waved through.
+
+**Conclusion:** the selection_key fix is validated. Across three batches
+(91 rounds, ~1,500 trained individuals) the champion from 2026-09-18 has
+never been beaten, but the *reason* it survives has shifted from "the
+search can't see what it's selecting for" (batches 1-2) to "the search sees
+correctly and still can't find anything better" (batch 3) -- a meaningfully
+stronger claim that this specific architecture/reward setup is at or very
+close to a genuine local optimum. Further gains from more rounds of the
+same population search now look unlikely; the more promising next lever is
+an architectural or algorithmic change (e.g. a different plasticity rule,
+reward shaping, or KC wiring scheme) rather than additional search volume
+under the current one.
