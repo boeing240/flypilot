@@ -264,7 +264,9 @@ async function refresh() {
     const st = await api("/api/admin/status");
     if (!SPEC) { SPEC = st.spec; buildForm(); }
     render(st);
-  } catch (e) { $("#pill").className = "pill"; $("#pill-text").textContent = "no connection"; }
+  } catch (e) { $("#pill").className = "pill"; $("#pill-text").textContent = "no connection";
+    $("#b-start").disabled = $("#b-pause").disabled = $("#b-hard").disabled = $("#b-reset").disabled = true;
+    toast("The league program is not running. Launch it with:  python -m flypilot.league", true); }
 }
 refresh(); setInterval(refresh, 1500);
 </script>

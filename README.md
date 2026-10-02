@@ -67,7 +67,7 @@ python -m flypilot.league
 
 Then open the **admin panel** at `http://127.0.0.1:8765/admin` (local-only),
 press Start, and point OBS (Browser Source, 1920x1080) at
-`http://127.0.0.1:8765/`. Add `--autostart` to begin running on launch.
+`http://127.0.0.1:8765/`. The program starts idle; a run is always started with the Start button in the admin panel (`/admin`).
 
 A field of flies (11 learners plus the reigning champion as the "Legend") trains
 continuously. Each round (Grand Prix) is one training block per pilot followed by

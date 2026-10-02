@@ -137,9 +137,6 @@ SETTINGS_SPEC = [
          apply="live", help="Flag wipe, podium and confetti."),
     dict(key="idle_replays", group="Broadcast", label="Replay while waiting", type="bool", default=False,
          apply="live", help="If the next round isn't ready, replay an old one instead of showing the training screen."),
-
-    dict(key="autostart", group="Startup", label="Start on launch", type="bool", default=False, apply="live",
-         help="Begin running as soon as the process starts."),
 ]
 SPEC_BY_KEY = {s["key"]: s for s in SETTINGS_SPEC}
 DEFAULTS = {s["key"]: s["default"] for s in SETTINGS_SPEC}
@@ -1026,10 +1023,7 @@ def main():
     if not args.no_serve:
         serve(league, args.host, args.port)
         league.log(f"viewer http://{args.host}:{args.port}/   admin http://{args.host}:{args.port}/admin")
-    if cfg["autostart"]:
-        league.start()
-    else:
-        league.log("stopped -- press Start in the admin panel")
+    league.log("stopped -- press Start in the admin panel")        # a run is always started from the admin
 
     try:
         while True:
