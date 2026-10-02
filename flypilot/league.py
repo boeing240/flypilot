@@ -84,8 +84,8 @@ SETTINGS_SPEC = [
          help="Trained pilots in the field. The Legend comes on top."),
     dict(key="legend", group="League", label="Include the Legend", type="bool", default=True, apply="round",
          help="The reigning champion from models/ races as a frozen benchmark."),
-    dict(key="seed", group="League", label="Seed", type="int", min=0, max=10**9, default=1, apply="reset",
-         help="Used when a new league is created."),
+    dict(key="seed", group="League", label="Seed", type="int", min=0, max=10**9, default=0, apply="reset",
+         help="0 = a fresh random seed for every new league (different pilots each time); a fixed number reproduces a league."),
     dict(key="k", group="League", label="Elo K-factor", type="float", min=4, max=128, step=1, default=32.0, apply="round",
          help="How far one race moves a rating."),
 
@@ -286,7 +286,8 @@ class League:
 
     # -- state
     def reset_state(self):
-        self.rng = random.Random(self.cfg["seed"])
+        self.league_seed = self.cfg["seed"] or random.SystemRandom().randrange(1, 10**9)
+        self.rng = random.Random(self.league_seed)
         self.gp = 0
         self.season = 1
         self.season_gp = 0
@@ -300,6 +301,7 @@ class League:
         self.pending_events: list[dict] = []
 
     def init_field(self):
+        self.log(f"new league, seed {self.league_seed}")
         if self.cfg["legend"]:
             self.add_legend()
         while len(self.trained()) < self.cfg["pilots"]:
@@ -307,7 +309,7 @@ class League:
 
     def save(self):
         blob = {k: getattr(self, k) for k in ("rng", "gp", "season", "season_gp", "pilots", "history", "records",
-                                              "events", "races", "used_names", "next_pid")}
+                                              "events", "races", "used_names", "next_pid", "league_seed")}
         data = pickle.dumps(blob)
         if CHECKPOINT_PATH.exists():
             try:                                   # keep the last checkpoint that still loads as the backup
