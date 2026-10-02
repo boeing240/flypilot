@@ -1002,7 +1002,10 @@ def main():
     # defaults < settings.json (edited in the admin panel) < explicit command-line flags
     cfg = dict(DEFAULTS)
     if SETTINGS_PATH.exists():
-        cfg = clean_settings(json.loads(SETTINGS_PATH.read_text()), cfg)
+        try:
+            cfg = clean_settings(json.loads(SETTINGS_PATH.read_text(encoding="utf-8-sig")), cfg)
+        except Exception as e:                       # a damaged settings file must never stop the program
+            print(f"settings.json is unreadable ({e!r}); using the defaults", flush=True)
     cfg = clean_settings({s["key"]: getattr(args, s["key"]) for s in SETTINGS_SPEC}, cfg)
 
     league = League(cfg, args.legend_path)
