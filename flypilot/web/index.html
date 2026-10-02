@@ -254,7 +254,8 @@
 "use strict";
 /* ============================================================ helpers */
 const $ = (s) => document.querySelector(s);
-const SC = 2;                      // canvas supersampling (stage is CSS-scaled)
+// canvas supersampling: only as much as the screen can show (the stage is CSS-scaled; full 2x canvases are costly on weak GPUs)
+const SC = Math.max(1, Math.min(2, Math.min(innerWidth / 1920, innerHeight / 1080) * (window.devicePixelRatio || 1) * 1.25));
 const FONT = '"Segoe UI", Inter, system-ui, Arial, sans-serif';
 const MONO = '"Cascadia Mono", Consolas, monospace';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

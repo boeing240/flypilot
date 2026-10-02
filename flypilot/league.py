@@ -65,6 +65,19 @@ HISTORY_POINTS = 120
 VIEWER_TIMEOUT = 20.0    # seconds without a heartbeat before the viewer counts as gone
 CPUS = os.cpu_count() or 2
 
+
+def lower_priority() -> None:
+    """Training must never starve the browser / stream encoder: run below normal priority."""
+    try:
+        if os.name == "nt":
+            import ctypes
+            ctypes.windll.kernel32.SetPriorityClass(ctypes.windll.kernel32.GetCurrentProcess(), 0x00004000)   # BELOW_NORMAL
+        else:
+            os.nice(10)
+    except Exception:
+        pass
+
+
 CONDITION_TITLES = {
     "nominal": ["Dry Strip Sprint", "Sunday Showdown", "Blue Hour Dash", "Eighth-Mile Open", "Prime Time Cup"],
     "hot_engine": ["Heatwave Cup", "Overheat Trophy"],
@@ -92,7 +105,7 @@ SETTINGS_SPEC = [
     dict(key="stage_episodes", group="Training", label="Episodes per round", type="int", min=5, max=2000, default=60,
          apply="round", help="Training episodes per pilot between races. Lower = a slower storyline."),
     dict(key="workers", group="Training", label="Worker processes", type="int", min=1, max=CPUS,
-         default=max(1, CPUS - 1), apply="round", help=f"Of {CPUS} cores. Leave one free for the stream encoder."),
+         default=max(1, CPUS // 2), apply="round", help=f"Of {CPUS} cores. Leave plenty free for the browser and the stream encoder."),
     dict(key="randomize_prob", group="Training", label="Domain randomization", type="float", min=0, max=1, step=0.05,
          default=0.0, apply="round", help="Share of training episodes on random traction/engine conditions."),
 
@@ -679,7 +692,7 @@ class League:
                     if pool:
                         pool.shutdown(wait=True)
                     workers = self.cfg["workers"]
-                    pool = ProcessPoolExecutor(max_workers=workers)
+                    pool = ProcessPoolExecutor(max_workers=workers, initializer=lower_priority)
                     self.goal.resubmit(pool)
                 t0 = time.time()
                 self.play_gp(pool)
@@ -1038,6 +1051,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main():
+    lower_priority()
     args = build_parser().parse_args()
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     RACES_DIR.mkdir(parents=True, exist_ok=True)
