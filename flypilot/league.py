@@ -37,7 +37,7 @@ import threading
 import time
 import traceback
 import urllib.parse
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 from .brain import FlyBrain
@@ -255,12 +255,32 @@ def atomic_write_bytes(path: pathlib.Path, data: bytes) -> None:
 
 # ---------------------------------------------------------------- league
 
+class Aborted(Exception):
+    """Raised inside a round when the admin pauses/resets: the round is dropped, not finished."""
+
+
+def kill_pool(pool) -> None:
+    """Stop a process pool right now, including workers that are in the middle of a task."""
+    procs = list((getattr(pool, "_processes", None) or {}).values())
+    try:
+        pool.shutdown(wait=False, cancel_futures=True)
+    except Exception:
+        pass
+    for pr in procs:
+        try:
+            pr.kill()
+        except Exception:
+            pass
+
+
 class League:
     def __init__(self, cfg: dict, legend_path: str = str(LEGEND_PATH)):
         self.cfg = cfg
         self.legend_path = legend_path
         self.lock = threading.RLock()
         self.logbuf: collections.deque = collections.deque(maxlen=300)
+        self.abort_req = False
+        self.round_gp = 0
         self.goal = Goal(lambda: self.cfg, self.log)
         self.status = "stopped"            # stopped | running | pausing
         self.phase = "stopped"
@@ -556,7 +576,7 @@ class League:
                     self.status = "running"
                     self.write_live()
                 return "already running"
-            self.pause_req = False
+            self.pause_req = self.abort_req = False
             self.status = "running"
             self.started_at = time.time()
             self.thread = threading.Thread(target=self._run, name="league", daemon=True)
@@ -568,16 +588,16 @@ class League:
         with self.lock:
             if not (self.thread and self.thread.is_alive()):
                 return "not running"
-            self.pause_req = True
+            self.pause_req = self.abort_req = True
             self.status = "pausing"
         self.write_live()
-        self.log("pause requested -- finishing the current round")
-        return "pausing after this round"
+        self.log("pause requested -- stopping right now")
+        return "paused (an unfinished round is dropped)"
 
     def reset(self) -> str:
+        if not self.stop_now():
+            return "could not stop the running league"
         with self.lock:
-            if self.thread and self.thread.is_alive():
-                return "pause first"
             self.archive_league(f"reset_gp{self.gp}")
             self.reset_state()
             self.wipe_files()
@@ -589,28 +609,17 @@ class League:
         return "reset"
 
     def hard_restart(self) -> str:
-        """Stop (even mid-run), archive the whole league, create a brand-new one and start it right away."""
+        """Stop at once (even mid-round), archive the whole league, create a brand-new one and start it right away."""
         with self.lock:
             if getattr(self, "restarting", False):
                 return "already restarting"
             self.restarting = True
-            running = bool(self.thread and self.thread.is_alive())
-            if running:
-                self.pause_req = True
-                self.status = "pausing"
-        self.write_live()
 
         def work():
             try:
-                t = self.thread
-                if running and t:
-                    self.log("hard restart: stopping the current run")
-                    t.join(timeout=1800)
-                    if t.is_alive():
-                        self.log("hard restart: the run did not stop in time -- aborted")
-                        return
-                self.reset()
-                self.start()
+                self.log("hard restart: stopping the current run")
+                if self.reset() == "reset":
+                    self.start()
             finally:
                 self.restarting = False
 
@@ -675,17 +684,45 @@ class League:
                 t0 = time.time()
                 self.play_gp(pool)
                 self.pace(t0)
+        except Aborted:
+            self.rollback()
         except Exception:
             self.log("league crashed:\n" + traceback.format_exc())
         finally:
             if pool:
                 try:
-                    self.drain_goal()
+                    if not self.abort_req:
+                        self.drain_goal()
                 finally:
-                    pool.shutdown(wait=False, cancel_futures=True)
+                    if self.abort_req:
+                        kill_pool(pool)
+                    else:
+                        pool.shutdown(wait=False, cancel_futures=True)
             self.status = "stopped"
             self.write_live("stopped")
             self.log("stopped")
+
+    def rollback(self):
+        """A round was dropped half-way: go back to the last finished (checkpointed) round."""
+        gp = self.round_gp
+        if not self.load():
+            self.gp = gp - 1
+        self.pending_events = []
+        self.write_state()
+        self.log(f"stopped immediately -- the unfinished Grand Prix {gp} was dropped")
+
+    def stop_now(self, timeout: float = 90.0) -> bool:
+        """Stop a running league at once (a round in progress is dropped) and wait until it is down."""
+        t = self.thread
+        if t and t.is_alive():
+            self.abort_req = self.pause_req = True
+            self.status = "pausing"
+            self.write_live()
+            t.join(timeout=timeout)
+            if t.is_alive():
+                return False
+        self.abort_req = False
+        return True
 
     def wait_for_viewer(self) -> bool:
         """Training only runs `lead_rounds` ahead of the round the page is showing,
@@ -713,6 +750,7 @@ class League:
         t_start = time.time()
         self.gp += 1
         gp = self.gp
+        self.round_gp = gp
         season, season_gp = self.season, self.season_gp + 1
         scenario = self.pick_scenario()
         title = self.rng.choice(CONDITION_TITLES[scenario])
@@ -731,14 +769,19 @@ class League:
             raced["legend"] = record_race(self.pilots["legend"]["brain"], scenario, race_seed)
         train_stats = {}
         done_pids = []
-        for fut in as_completed(futures):
-            pid = futures[fut]
-            p = self.pilots[pid]
-            p["brain"], p["dl"], p["dt"], p["episodes"], train_stats[pid], raced[pid] = fut.result()
-            s = train_stats[pid]
-            p["last_train"] = [s["finished"], s["crash"], s["timeout"], s["n"]]
-            done_pids.append(pid)
-            self.write_live("training", len(done_pids), len(trained), done_pids, gp)
+        waiting = set(futures)
+        while waiting:
+            if self.abort_req:
+                raise Aborted()
+            done, waiting = wait(waiting, timeout=0.25, return_when=FIRST_COMPLETED)
+            for fut in done:
+                pid = futures[fut]
+                p = self.pilots[pid]
+                p["brain"], p["dl"], p["dt"], p["episodes"], train_stats[pid], raced[pid] = fut.result()
+                s = train_stats[pid]
+                p["last_train"] = [s["finished"], s["crash"], s["timeout"], s["n"]]
+                done_pids.append(pid)
+                self.write_live("training", len(done_pids), len(trained), done_pids, gp)
 
         # classification: finishers by time, everyone else by distance covered
         def key(pid):

@@ -34,6 +34,7 @@
   button:disabled { opacity: .35; cursor: not-allowed; }
   button.go { background: #12402c; border-color: #1f6a47; color: #b4f5d5; grid-column: 1 / 3; font-size: 17px; padding: 15px; }
   button.go:hover:not(:disabled) { background: #185a3d; }
+  button.armed { background: #7a1c2a !important; color: #fff !important; }
   button.danger { border-color: #5e2530; color: #ff9aa6; background: #1f1217; grid-column: 1 / 3; }
   button.danger:hover:not(:disabled) { background: #2e1820; }
   button.save { background: #1b3270; border-color: #2c4fb3; color: #dbe6ff; width: 100%; font-size: 16px; padding: 14px; margin-top: 6px; }
@@ -81,12 +82,12 @@
       <h2>Control</h2>
       <div class="btns">
         <button class="go" id="b-start">&#9654; Start</button>
-        <button id="b-pause">&#10074;&#10074; Pause after round</button>
+        <button id="b-pause">&#10074;&#10074; Pause now</button>
         <button id="b-save-top" title="same as Save settings">Save settings</button>
         <button class="danger" id="b-hard" title="works while running">&#8635; Hard restart&hellip; (new league, starts at once)</button>
         <button class="danger" id="b-reset">Reset league&hellip; (new pilots, rating zero)</button>
       </div>
-      <p class="note">Pause lets the current round finish and be published, then stops. Everything is checkpointed after each round, so closing the program never loses a finished round.</p>
+      <p class="note">Pause and the reset buttons act at once: a round that is still training is dropped and the league goes back to the last finished round (those results are checkpointed after every round and never lost). The reset buttons need a second click to confirm.</p>
     </section>
 
     <section class="card">
@@ -211,12 +212,17 @@ async function act(action) {
 $("#b-start").onclick = () => act("start");
 $("#b-pause").onclick = () => act("pause");
 $("#b-save").onclick = save; $("#b-save-top").onclick = save;
-$("#b-hard").onclick = () => {
-  if (confirm("Hard restart?\n\nThe current round finishes, the whole league is archived (nothing is deleted), a brand-new field with a new seed is created and starts racing immediately.")) act("hard_restart");
-};
-$("#b-reset").onclick = () => {
-  if (confirm("Reset the league?\n\nAll pilots, brains, ratings and race history are deleted and a new field is created.\nSettings are kept.")) act("reset");
-};
+// confirm() is blocked in embedded browsers (OBS docks, app panes), so the dangerous buttons confirm in place: click twice
+function armed(btn, text, fn) {
+  const label = btn.innerHTML; let timer = 0, on = false;
+  btn.onclick = () => {
+    if (on) { clearTimeout(timer); on = false; btn.innerHTML = label; btn.classList.remove("armed"); fn(); return; }
+    on = true; btn.innerHTML = text; btn.classList.add("armed");
+    timer = setTimeout(() => { on = false; btn.innerHTML = label; btn.classList.remove("armed"); }, 5000);
+  };
+}
+armed($("#b-hard"), "Click again: hard restart now", () => act("hard_restart"));
+armed($("#b-reset"), "Click again: reset now", () => act("reset"));
 
 /* ---------- status ---------- */
 const fmtDur = (s) => { s = Math.floor(s); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h ? `${h}h ${m}m` : `${m}m ${s % 60}s`; };
@@ -227,7 +233,7 @@ function render(st) {
   $("#b-start").disabled = st.status === "running";
   $("#b-start").innerHTML = st.status === "pausing" ? "&#9654; Resume" : "&#9654; Start";
   $("#b-pause").disabled = st.status !== "running";
-  $("#b-reset").disabled = st.status !== "stopped";
+  $("#b-reset").disabled = false;
   const lv = st.live || {};
   $("#s-gp").textContent = st.gp ? `${st.gp} done` : "none yet";
   $("#s-season").textContent = `${st.season} (round ${st.season_gp + 1}/${st.settings.retire_every})`;
