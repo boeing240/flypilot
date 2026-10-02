@@ -69,6 +69,8 @@
   .row .form i { width: 9px; height: 9px; border-radius: 50%; background: #2a3750; }
   .row .form i.W { background: var(--gold); } .row .form i.F { background: var(--up); }
   .row .form i.C { background: var(--down); } .row .form i.T { background: #6b7a93; }
+  .row .pb.flash { animation: pbflash 2.2s ease-out; transform-origin: right center; }
+  @keyframes pbflash { 0% { color: #fff; text-shadow: 0 0 12px var(--gold); transform: scale(1.35); } 100% { color: #c9d6ec; text-shadow: none; transform: none; } }
   .row .pb { width: 64px; text-align: right; font-family: var(--mono); font-size: 16px; color: #c9d6ec; flex: none; }
   .row .elo { width: 92px; text-align: right; flex: none; }
   .row .elo b { display: block; font-family: var(--mono); font-size: 21px; font-weight: 700; }
@@ -624,6 +626,7 @@ function drawFrame(simT, anim) {
   const px = (x) => X0 + (Math.min(x, L) / L) * (XEND - X0);
   for (const e of entries) {
     const s = sample(e, k), done = simT >= e.tEnd, st = e.result.status;
+    if (done && !e.pbShown) { e.pbShown = true; if (R.live) revealPb(e.pid); }          // a personal best shows the moment the fly crosses the line
     const roll = anim ? (1 - ease((anim.p - 0.15 - (e.lane - 1) * 0.02) / 0.35)) * (X0 + 60) : 0;
     const cx = px(s.x) - roll, cy = e.cy + (s.y / 1.2) * maxOff;
     if (anim && roll > X0 + 55) continue;
@@ -694,9 +697,18 @@ let bannerTimer = 0;
 function showBanner() {
   const w = R.winner; if (!w) return;
   const m = R.race.pilots[w.pid] || M(w.pid);
+  if (R.live && R.race.records) { G.records = R.race.records; renderTicker(); }         // a new track record shows at once, not after the podium
   $("#banner-face").innerHTML = faceImg(m, 64);
   $("#banner-v").innerHTML = `#${m.number} ${esc(m.name)}<span>${fmtT(w.time)} s</span>`;
   $("#banner").classList.add("show"); clearTimeout(bannerTimer); bannerTimer = setTimeout(() => $("#banner").classList.remove("show"), 6000);
+}
+function revealPb(pid) {
+  const after = R.race.after.find((x) => x.pid === pid), row = G.rows.get(pid);
+  if (!after || !row || !after.pb) return;
+  const txt = after.pb.toFixed(2);
+  if (row.pb.textContent !== txt) {
+    row.pb.textContent = txt; row.pb.classList.remove("flash"); void row.pb.offsetWidth; row.pb.classList.add("flash");
+  }
 }
 const hideBanner = () => { clearTimeout(bannerTimer); $("#banner").classList.remove("show"); };
 
@@ -822,7 +834,7 @@ function runRace(live) {
 async function playRace(race, live) {
   const B = bc(), anim = B.animations;
   for (const [pid, m] of Object.entries(race.pilots)) if (!G.meta[pid]) G.meta[pid] = m;
-  prepareRace(race); R.ff = B.fast_forward; setHeader(race, live);
+  prepareRace(race); R.ff = B.fast_forward; R.live = live; setHeader(race, live);
   stopConfetti(); hideBanner(); hidePodium();
   G.hbGp = live ? race.gp : Math.max(G.lastGp, 0);
   $("#timing-title").textContent = "Starting grid"; $("#timing-tag").textContent = live ? "" : "REPLAY";
