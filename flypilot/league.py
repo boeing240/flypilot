@@ -591,6 +591,35 @@ class League:
         self.log(f"league reset: {len(self.pilots)} pilots")
         return "reset"
 
+    def hard_restart(self) -> str:
+        """Stop (even mid-run), archive the whole league, create a brand-new one and start it right away."""
+        with self.lock:
+            if getattr(self, "restarting", False):
+                return "already restarting"
+            self.restarting = True
+            running = bool(self.thread and self.thread.is_alive())
+            if running:
+                self.pause_req = True
+                self.status = "pausing"
+        self.write_live()
+
+        def work():
+            try:
+                t = self.thread
+                if running and t:
+                    self.log("hard restart: stopping the current run")
+                    t.join(timeout=1800)
+                    if t.is_alive():
+                        self.log("hard restart: the run did not stop in time -- aborted")
+                        return
+                self.reset()
+                self.start()
+            finally:
+                self.restarting = False
+
+        threading.Thread(target=work, name="hard-restart", daemon=True).start()
+        return "hard restart: new league starts in a moment (the old one is archived)"
+
     def set_settings(self, raw: dict) -> dict:
         with self.lock:
             before = dict(self.cfg)
@@ -934,7 +963,8 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._send_json(self.league.set_settings(body))
             if path == "/api/admin/action":
                 act = body.get("action")
-                fn = {"start": self.league.start, "pause": self.league.pause, "reset": self.league.reset}.get(act)
+                fn = {"start": self.league.start, "pause": self.league.pause, "reset": self.league.reset,
+                                                  "hard_restart": self.league.hard_restart}.get(act)
                 if fn is None:
                     return self._send_json({"error": "unknown action"}, 400)
                 return self._send_json({"result": fn()})

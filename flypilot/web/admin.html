@@ -83,6 +83,7 @@
         <button class="go" id="b-start">&#9654; Start</button>
         <button id="b-pause">&#10074;&#10074; Pause after round</button>
         <button id="b-save-top" title="same as Save settings">Save settings</button>
+        <button class="danger" id="b-hard" title="works while running">&#8635; Hard restart&hellip; (new league, starts at once)</button>
         <button class="danger" id="b-reset">Reset league&hellip; (new pilots, rating zero)</button>
       </div>
       <p class="note">Pause lets the current round finish and be published, then stops. Everything is checkpointed after each round, so closing the program never loses a finished round.</p>
@@ -210,6 +211,11 @@ async function act(action) {
 $("#b-start").onclick = () => act("start");
 $("#b-pause").onclick = () => act("pause");
 $("#b-save").onclick = save; $("#b-save-top").onclick = save;
+$("#b-hard").onclick = () => {
+  if (confirm("Hard restart?
+
+The current round finishes, the whole league is archived (nothing is deleted), a brand-new field with a new seed is created and starts racing immediately.")) act("hard_restart");
+};
 $("#b-reset").onclick = () => {
   if (confirm("Reset the league?\n\nAll pilots, brains, ratings and race history are deleted and a new field is created.\nSettings are kept.")) act("reset");
 };
