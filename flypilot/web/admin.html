@@ -212,9 +212,7 @@ $("#b-start").onclick = () => act("start");
 $("#b-pause").onclick = () => act("pause");
 $("#b-save").onclick = save; $("#b-save-top").onclick = save;
 $("#b-hard").onclick = () => {
-  if (confirm("Hard restart?
-
-The current round finishes, the whole league is archived (nothing is deleted), a brand-new field with a new seed is created and starts racing immediately.")) act("hard_restart");
+  if (confirm("Hard restart?\n\nThe current round finishes, the whole league is archived (nothing is deleted), a brand-new field with a new seed is created and starts racing immediately.")) act("hard_restart");
 };
 $("#b-reset").onclick = () => {
   if (confirm("Reset the league?\n\nAll pilots, brains, ratings and race history are deleted and a new field is created.\nSettings are kept.")) act("reset");
