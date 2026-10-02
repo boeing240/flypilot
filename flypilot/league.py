@@ -437,7 +437,13 @@ class League:
             archive_pilot(cp, "crowned", self.gp)
             self.history.pop(out["pid"], None)
 
-    def add_rookie(self) -> dict:
+    def add_rookie(self, rating: float | None = None) -> dict:
+        """A new fly takes over a vacated seat *with that seat's rating*, so points are neither created nor lost
+        (a rookie entering at a flat 1500 while the retiree sat lower would inflate everybody's rating).
+        With no seat to inherit it starts at the field's lowest rating."""
+        if rating is None:
+            rs = [q["rating"] for q in self.trained()]
+            rating = min(rs) if rs else START_RATING
         pid = f"p{self.next_pid}"
         self.next_pid += 1
         seed = self.rng.randrange(1, 10**9)
@@ -448,7 +454,8 @@ class League:
                          eta=round(rr.uniform(0.01, 0.04), 4), lat_kc_fraction=0.25)
         pilot = self._new_pilot(pid, ident, brain, seed)
         self.pilots[pid] = pilot
-        self.history[pid] = [[self.gp, START_RATING]]
+        pilot["rating"] = round(rating, 1)
+        self.history[pid] = [[self.gp, pilot["rating"]]]
         return pilot
 
     @staticmethod
@@ -929,7 +936,7 @@ class League:
             best = f", best {worst['pb']:.2f} s" if worst["pb"] else ""
             events.append({"kind": "retire", "text": f"{worst['name']} ({worst['nation']}) retires after "
                            f"{worst['races']} races{best}"})
-            rookie = self.add_rookie()
+            rookie = self.add_rookie(worst["rating"])
             events.append({"kind": "rookie", "pid": rookie["id"],
                            "text": f"Rookie {rookie['name']} ({rookie['nation']}) joins as #{rookie['number']}"})
         return events
