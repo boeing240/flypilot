@@ -342,7 +342,7 @@ class League:
             self.log(f"previous league kept in {dst.relative_to(ROOT)}")
 
     def wipe_files(self):
-        for f in (CHECKPOINT_PATH, STATE_PATH, LIVE_PATH):
+        for f in (CHECKPOINT_PATH, CHECKPOINT_BAK, STATE_PATH, LIVE_PATH):
             f.unlink(missing_ok=True)
         shutil.rmtree(RACES_DIR, ignore_errors=True)
         RACES_DIR.mkdir(parents=True, exist_ok=True)

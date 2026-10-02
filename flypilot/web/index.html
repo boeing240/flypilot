@@ -58,7 +58,9 @@
   }
   .row.legend { background: linear-gradient(90deg, #2b2610 0%, var(--panel-2) 70%); box-shadow: inset 0 0 0 1px #6b5a14; }
   .row .pos { width: 34px; text-align: center; font-family: var(--mono); font-size: 20px; font-weight: 700; color: #b6c4dc; }
-  .row .num { width: 42px; height: 28px; border-radius: 7px; background: var(--c); color: #0b0f17; font-weight: 800; font-family: var(--mono); font-size: 16px; display: flex; align-items: center; justify-content: center; flex: none; }
+  .face { display: block; flex: none; }
+  .row .face { width: 50px; height: 50px; border-radius: 50%; background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--c) 38%, #0b0f17), #0b0f17 75%); border: 2px solid var(--c); padding: 2px; }
+  .row.legend .face { box-shadow: 0 0 14px rgba(255,215,0,.55); }
   .row .who { flex: 1; min-width: 0; }
   .row .nm { font-size: 19px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .row .sub { font-size: 12px; color: var(--muted); letter-spacing: .06em; margin-top: 2px; white-space: nowrap; }
@@ -92,6 +94,8 @@
   }
   #banner.show { opacity: 1; transform: none; }
   #banner .k { font-size: 14px; letter-spacing: .3em; color: #d9c44a; }
+  #banner { display: flex; align-items: center; justify-content: center; gap: 18px; }
+  #banner .face { border-radius: 50%; background: #0b0f17; border: 2px solid var(--gold); padding: 3px; }
   #banner .v { font-size: 32px; font-weight: 800; margin-top: 2px; }
   #banner .v span { font-family: var(--mono); color: var(--gold); margin-left: 12px; }
 
@@ -114,13 +118,18 @@
   #podium.show .pod { animation: rise .85s cubic-bezier(.2,.9,.25,1.08) forwards; }
   .pod.p3 { animation-delay: .1s !important; } .pod.p2 { animation-delay: .5s !important; } .pod.p1 { animation-delay: .95s !important; }
   @keyframes rise { to { opacity: 1; transform: none; } }
-  .pod .who { text-align: center; margin-bottom: 10px; max-width: 100%; }
-  .pod .num { display: inline-block; min-width: 46px; padding: 3px 10px; border-radius: 7px; background: var(--c); color: #0b0f17; font-family: var(--mono); font-weight: 800; font-size: 18px; }
-  .pod .nm { font-size: 22px; font-weight: 700; margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .pod.p1 .nm { font-size: 27px; }
-  .pod .tm { font-family: var(--mono); font-size: 24px; color: var(--gold); margin-top: 2px; }
+  .pod .who { text-align: center; margin-bottom: 10px; width: 100%; }
+  .pod .face { margin: 0 auto 6px; border-radius: 50%; background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--c) 40%, #0b0f17), #0b0f17 75%); border: 3px solid var(--c); padding: 5px; }
+  .pod.p1 .face { box-shadow: 0 0 36px rgba(255,215,0,.5); border-color: var(--gold); animation: bob 1.4s ease-in-out infinite; }
+  @keyframes bob { 50% { transform: translateY(-8px) rotate(3deg); } }
+  .pod .num { display: inline-block; padding: 1px 6px; border-radius: 7px; background: var(--c); color: #0b0f17; font-family: var(--mono); font-weight: 800; font-size: 15px; }
+  .pod .plate { width: 100%; padding: 8px 10px 7px; border-radius: 10px; background: #0b0f17; border: 2px solid var(--c); box-shadow: 0 4px 18px rgba(0,0,0,.5); }
+  .pod.p1 .plate { border-color: var(--gold); background: linear-gradient(180deg, #2a2308, #0b0f17); }
+  .pod .nm { font-size: 20px; font-weight: 700; line-height: 1.15; color: #fff; word-break: break-word; }
+  .pod.p1 .nm { font-size: 24px; }
+  .pod .tm { font-family: var(--mono); font-size: 24px; color: var(--gold); margin-top: 3px; }
   .pod .blk { width: 100%; border-radius: 10px 10px 0 0; display: flex; justify-content: center; padding-top: 8px; font-size: 44px; font-weight: 800; color: rgba(8,12,20,.55); background: var(--c); }
-  .pod.p1 .blk { height: 150px; } .pod.p2 .blk { height: 108px; } .pod.p3 .blk { height: 76px; }
+  .pod.p1 .blk { height: 96px; } .pod.p2 .blk { height: 68px; } .pod.p3 .blk { height: 46px; }
   #confetti { position: absolute; left: 0; top: 0; width: 1316px; height: 560px; z-index: 6; pointer-events: none; }
   #between { position: absolute; left: 0; right: 0; top: 0; bottom: 0; z-index: 4; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
     background: rgba(8,12,20,.8); opacity: 0; pointer-events: none; transition: opacity .5s; backdrop-filter: blur(3px); }
@@ -132,12 +141,14 @@
   #between .bbar { width: 420px; height: 6px; background: #1b2639; border-radius: 99px; overflow: hidden; margin-top: 10px; }
   #between .bbar > div { height: 100%; width: 0; background: var(--accent); }
   #between .btrain { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 900px; margin-top: 14px; }
-  .tp { font-size: 15px; padding: 5px 12px; border-radius: 99px; background: #172033; border: 1px solid var(--line); color: #7b8ca8; border-left: 4px solid var(--c); }
+  .tp { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; padding: 4px 12px 4px 5px; border-radius: 99px; background: #172033; border: 1px solid var(--line); color: #7b8ca8; border-left: 4px solid var(--c); }
+  .tp .face { border-radius: 50%; background: #0b0f17; }
   .tp.done { color: #e8eef9; background: #11301f; border-color: #1f5a41; border-left-color: var(--c); }
 
   #crown { position: absolute; inset: 0; z-index: 7; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
     background: radial-gradient(circle at center, rgba(78,60,4,.94), rgba(8,12,20,.97) 75%); opacity: 0; pointer-events: none; transition: opacity .6s; }
   #crown.show { opacity: 1; }
+  #crown .face { filter: drop-shadow(0 0 40px rgba(255,215,0,.6)); animation: bob 1.6s ease-in-out infinite; }
   #crown .ck { font-size: 20px; letter-spacing: .5em; color: #e6cf55; }
   #crown .cn { font-size: 66px; font-weight: 800; color: #fff; text-shadow: 0 0 44px rgba(255,215,0,.65); text-align: center; padding: 0 30px; }
   #crown .ct { font-family: var(--mono); font-size: 48px; color: var(--gold); }
@@ -149,7 +160,8 @@
   .tr { position: absolute; left: 0; right: 0; display: flex; align-items: center; gap: 8px; font-size: 14px; border-radius: 6px; padding: 0 8px; transition: transform .25s; }
   .tr:nth-child(odd) { background: rgba(255,255,255,.025); }
   .tr .p { width: 24px; font-family: var(--mono); font-weight: 700; color: #b6c4dc; text-align: right; }
-  .tr .c { width: 34px; height: 15px; border-radius: 4px; font-family: var(--mono); font-size: 11px; font-weight: 800; color: #0b0f17; display: flex; align-items: center; justify-content: center; flex: none; }
+  .tr .c { width: 20px; height: 20px; flex: none; border-radius: 50%; background: #0b0f17; border: 1.5px solid var(--c); padding: 1px; }
+  .tr .c img { width: 100%; height: 100%; display: block; }
   .tr .n { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tr .a { width: 84px; text-align: right; font-family: var(--mono); }
   .tr .b { width: 76px; text-align: right; font-family: var(--mono); color: var(--muted); }
@@ -190,7 +202,7 @@
         <circle cx="24" cy="15" r="6.5" fill="#ffd700"/>
         <circle cx="21" cy="14" r="2.4" fill="#e5334b"/><circle cx="27" cy="14" r="2.4" fill="#e5334b"/>
       </svg>
-      <div><div class="brand-name" id="league-name">FLY PILOT LEAGUE</div><div class="brand-sub">tiny brains learning to drive &middot; live</div></div>
+      <div><div class="brand-name" id="league-name">FLY PILOT LEAGUE</div><div class="brand-sub">real fly-brain pilots learning to race &middot; live</div></div>
     </div>
     <div id="gpinfo"><div id="gp-title">Connecting&hellip;</div><div id="gp-chips"></div></div>
     <div id="top-right">
@@ -209,12 +221,12 @@
   <section id="trackp" class="panel">
     <canvas id="track"></canvas>
     <div id="card"><div class="k" id="card-k"></div><div class="t" id="card-t"></div><div class="chips" id="card-chips"></div></div>
-    <div id="banner"><div class="k">WINNER</div><div class="v" id="banner-v"></div></div>
+    <div id="banner"><span id="banner-face"></span><div><div class="k">WINNER</div><div class="v" id="banner-v"></div></div></div>
     <div id="sweep"></div><div id="wipe"></div>
     <div id="podium"><div class="pk" id="podium-k"></div><div id="podium-body"></div></div>
     <div id="between"><div class="bk" id="bt-k"></div><div class="bn" id="bt-n"></div><div class="bs" id="bt-s"></div>
       <div class="bbar"><div id="bt-bar"></div></div><div class="btrain" id="bt-train"></div></div>
-    <div id="crown"><div class="ck">NEW CHAMPION</div><div class="cn" id="crown-n"></div><div class="ct" id="crown-t"></div><div class="cs" id="crown-s"></div></div>
+    <div id="crown"><span id="crown-face"></span><div class="ck">NEW CHAMPION</div><div class="cn" id="crown-n"></div><div class="ct" id="crown-t"></div><div class="cs" id="crown-s"></div></div>
     <canvas id="confetti"></canvas>
   </section>
 
@@ -259,6 +271,66 @@ const G = { state: null, live: null, meta: {}, races: new Map(), queue: [], last
 const bc = () => ({ ...BC_DEFAULT, ...((G.live && G.live.broadcast) || {}) });
 const M = (pid) => G.meta[pid] || { name: pid, nation: "", number: 0, color: "#888", legend: false };
 
+/* ============================================================ the flies: portraits and riders */
+const faceCache = new Map();
+function faceCanvas(color, legend) {
+  const key = color + (legend ? "*" : ""); if (faceCache.has(key)) return faceCache.get(key);
+  const S = 160, c = document.createElement("canvas"); c.width = c.height = S; const g = c.getContext("2d");
+  const hel = legend ? "#ffd700" : color;
+  g.lineCap = "round";
+  g.strokeStyle = "#2a2118"; g.lineWidth = 4;                                   // antennae
+  for (const sx of [-1, 1]) {
+    g.beginPath(); g.moveTo(80 + sx * 10, 36); g.quadraticCurveTo(80 + sx * 22, 14, 80 + sx * 30, 12); g.stroke();
+    g.fillStyle = "#4a3a2a"; g.beginPath(); g.ellipse(80 + sx * 31, 13, 7, 4.5, sx * 0.5, 0, 7); g.fill();
+  }
+  g.fillStyle = "#4b3b2c"; g.beginPath(); g.ellipse(80, 92, 50, 52, 0, 0, 7); g.fill();       // head
+  const eye = (cx) => {                                                          // compound eye
+    const grd = g.createRadialGradient(cx - 6, 78, 4, cx, 88, 36);
+    grd.addColorStop(0, "#ff6a55"); grd.addColorStop(.55, "#d31a2e"); grd.addColorStop(1, "#7c0715");
+    g.save(); g.beginPath(); g.ellipse(cx, 90, 27, 36, cx < 80 ? 0.12 : -0.12, 0, 7); g.fillStyle = grd; g.fill(); g.clip();
+    g.fillStyle = "rgba(60,0,8,.28)";
+    for (let y = 54, r = 0; y < 128; y += 7, r++) for (let x = cx - 30 + (r % 2) * 3.5; x < cx + 30; x += 7) { g.beginPath(); g.arc(x, y, 1.5, 0, 7); g.fill(); }
+    g.restore();
+    g.fillStyle = "rgba(255,255,255,.75)"; g.beginPath(); g.ellipse(cx + (cx < 80 ? -8 : 8), 74, 6, 10, cx < 80 ? 0.5 : -0.5, 0, 7); g.fill();
+  };
+  eye(52); eye(108);
+  g.fillStyle = "#d8b078"; g.beginPath(); g.ellipse(80, 112, 14, 22, 0, 0, 7); g.fill();       // face
+  g.fillStyle = "#1c140d"; g.beginPath(); g.ellipse(80, 108, 3, 2, 0, 0, 7); g.fill();
+  g.fillStyle = "#8a6a43"; g.beginPath(); g.ellipse(80, 134, 8, 9, 0, 0, 7); g.fill();          // proboscis
+  g.beginPath(); g.moveTo(24, 78); g.quadraticCurveTo(80, -2, 136, 78); g.quadraticCurveTo(80, 52, 24, 78); g.closePath();   // helmet
+  g.fillStyle = hel; g.fill(); g.lineWidth = 3; g.strokeStyle = "rgba(0,0,0,.45)"; g.stroke();
+  g.strokeStyle = "rgba(255,255,255,.88)"; g.lineWidth = 9; g.beginPath(); g.moveTo(80, 12); g.lineTo(80, 60); g.stroke();   // racing stripe
+  if (legend) {
+    g.fillStyle = "#ffd700"; g.strokeStyle = "#7a5f00"; g.lineWidth = 3; g.beginPath();
+    g.moveTo(56, 22); g.lineTo(52, 2); g.lineTo(68, 12); g.lineTo(80, -2); g.lineTo(92, 12); g.lineTo(108, 2); g.lineTo(104, 22); g.closePath(); g.fill(); g.stroke();
+  }
+  faceCache.set(key, c); return c;
+}
+const faceURLs = new Map();
+function faceURL(m) {
+  const key = m.color + (m.legend ? "*" : "");
+  if (!faceURLs.has(key)) faceURLs.set(key, faceCanvas(m.color, m.legend).toDataURL());
+  return faceURLs.get(key);
+}
+const faceImg = (m, px, cls = "") => `<img class="face ${cls}" src="${faceURL(m)}" width="${px}" height="${px}" alt="">`;
+
+// the fly at the wheel: a side view with flapping wings, a red eye and a helmet in its livery colour
+function drawRider(g, x, y, r, color, legend, t, v) {
+  const flap = Math.sin(t * (22 + v * 0.5)) * 0.55;
+  g.save(); g.translate(x, y);
+  g.fillStyle = "rgba(190,225,255,.5)"; g.strokeStyle = "rgba(220,240,255,.7)"; g.lineWidth = 0.8;
+  for (const a of [-0.45 + flap, 0.45 - flap]) {
+    g.save(); g.rotate(Math.PI + a); g.beginPath(); g.ellipse(r * 0.8, 0, r * 0.8, r * 0.32, 0, 0, 7); g.fill(); g.stroke(); g.restore();
+  }
+  g.fillStyle = "#4b3b2c"; g.beginPath(); g.arc(0, 0, r, 0, 7); g.fill();
+  g.fillStyle = "#d31a2e"; g.beginPath(); g.ellipse(r * 0.18, -r * 0.05, r * 0.68, r * 0.74, 0, 0, 7); g.fill();
+  g.fillStyle = "rgba(255,255,255,.8)"; g.beginPath(); g.arc(r * 0.02, -r * 0.3, r * 0.2, 0, 7); g.fill();
+  g.fillStyle = legend ? "#ffd700" : color; g.strokeStyle = "rgba(0,0,0,.5)"; g.lineWidth = 1;
+  g.beginPath(); g.arc(0, -r * 0.1, r * 1.04, Math.PI * 1.02, Math.PI * 1.98); g.closePath(); g.fill(); g.stroke();
+  g.fillStyle = "#fff"; g.fillRect(-r * 0.12, -r * 1.12, r * 0.24, r * 0.7);
+  g.restore();
+}
+
 function fit() {
   const s = Math.min(innerWidth / 1920, innerHeight / 1080);
   $("#stage").style.transform = `translate(-50%, -50%) scale(${s})`;
@@ -284,10 +356,10 @@ const RANK_AREA = 800;
 function makeRow() {
   const el = document.createElement("div");
   el.className = "row";
-  el.innerHTML = `<div class="pos"></div><div class="num"></div><div class="who"><div class="nm"></div><div class="sub"></div></div>
+  el.innerHTML = `<div class="pos"></div><img class="face" width="50" height="50" alt=""><div class="who"><div class="nm"></div><div class="sub"></div></div>
     <div class="form"></div><div class="pb"></div><div class="elo"><b></b><div class="dl"></div></div>`;
   const q = (s) => el.querySelector(s);
-  return { el, pos: q(".pos"), num: q(".num"), nm: q(".nm"), sub: q(".sub"), form: q(".form"), pb: q(".pb"), elo: q(".elo b"), dl: q(".dl"),
+  return { el, pos: q(".pos"), face: q(".face"), nm: q(".nm"), sub: q(".sub"), form: q(".form"), pb: q(".pb"), elo: q(".elo b"), dl: q(".dl"),
            shown: null, raf: 0 };
 }
 function tweenNumber(row, target) {
@@ -319,9 +391,9 @@ function renderRank(snap) {
     row.el.style.setProperty("--c", m.color);
     row.el.classList.toggle("legend", !!m.legend);
     row.pos.textContent = s.rank;
-    row.num.textContent = m.number;
+    const fu = faceURL(m); if (row.face.dataset.u !== fu) { row.face.dataset.u = fu; row.face.src = fu; }
     row.nm.textContent = m.name;
-    row.sub.textContent = `${m.nation}  ·  ${s.episodes.toLocaleString("en-US")} eps${m.legend ? "  ·  reigning champion" : ""}`;
+    row.sub.textContent = `#${m.number}  ·  ${m.nation}  ·  ${s.episodes.toLocaleString("en-US")} eps${m.legend ? "  ·  reigning champion" : ""}`;
     row.pb.textContent = s.pb ? s.pb.toFixed(2) : "–";
     const f = s.form.slice(-5);
     row.form.innerHTML = Array.from({ length: 5 - f.length }, () => "<i></i>").join("") + f.map((c) => `<i class="${c}"></i>`).join("");
@@ -441,7 +513,7 @@ function timingRows(rows, firstGold) {
   const area = 304 - 44 - 8, n = Math.max(rows.length, 1), rh = Math.min(22, Math.floor(area / n));
   $("#timing-rows").innerHTML = rows.map((r, i) =>
     `<div class="tr ${i === 0 && firstGold ? "first" : ""}" style="height:${rh}px;transform:translateY(${i * rh}px)">
-       <div class="p">${r.p}</div><div class="c" style="background:${r.color}">${r.num}</div><div class="n">${esc(r.name)}</div>
+       <div class="p">${r.p}</div><div class="c" style="--c:${r.color}"><img src="${r.face}" alt=""></div><div class="n">${esc(r.name)}</div>
        <div class="a ${r.aCls || ""}">${r.a}</div><div class="b">${r.b}</div><div class="d ${r.dCls || ""}">${r.d}</div></div>`).join("");
 }
 
@@ -469,7 +541,7 @@ function prepareRace(race) {
   const g = tg; g.font = `600 ${laneH > 36 ? 15 : 13}px ${FONT}`;
   for (const e of entries) {                                   // lane-tag labels, fitted once
     let name = (e.m.legend ? "★ " : "") + e.m.name;
-    while (g.measureText(name).width > TAGW - 66 && name.length > 4) name = name.slice(0, -2);
+    while (g.measureText(name).width > TAGW - 70 && name.length > 4) name = name.slice(0, -2);
     e.tagName = name;
   }
 }
@@ -515,14 +587,14 @@ function sample(e, k) {
   return { x: lerp(t.x[i], t.x[i + 1], f), y: lerp(t.y[i], t.y[i + 1], f), v: lerp(t.v[i], t.v[i + 1], f), g: t.g[i], s: lerp(t.s[i], t.s[i + 1], f) };
 }
 
-function drawCar(g, x, cy, w, color, num, angle, alpha) {
-  const L = 34;
+function drawCar(g, x, cy, w, color, num, angle, alpha, legend, t, v) {
+  const L = 38;
   g.save(); g.translate(x, cy); if (angle) g.rotate(angle); g.globalAlpha = alpha;
   g.fillStyle = "rgba(0,0,0,.35)"; rr(g, -L + 2, -w / 2 + 3, L, w, 5); g.fill();
   g.fillStyle = color; rr(g, -L, -w / 2, L, w, 5); g.fill();
-  g.fillStyle = "rgba(10,14,22,.55)"; rr(g, -L * 0.7, -w / 2 + 2.5, L * 0.42, w - 5, 3); g.fill();
   g.fillStyle = "#fff6c4"; g.fillRect(-3, -w / 2 + 1.5, 3, 3); g.fillRect(-3, w / 2 - 4.5, 3, 3);
-  g.fillStyle = "#fff"; g.font = `800 ${w >= 16 ? 10 : 9}px ${MONO}`; g.textAlign = "center"; g.fillText(num, -L * 0.49, 3.4);
+  g.fillStyle = "#fff"; g.font = `800 ${w >= 16 ? 10 : 9}px ${MONO}`; g.textAlign = "center"; g.fillText(num, -L * 0.16, 3.4);
+  drawRider(g, -L * 0.52, 0, w * 0.62, color, legend, t, v);
   g.restore();
 }
 
@@ -536,13 +608,15 @@ function drawFrame(simT, anim) {
     const y = e.cy - laneH / 2, m = e.m;
     g.save(); g.translate(off, 0);
     g.fillStyle = "#101826"; g.fillRect(0, y, TAGW, laneH);
-    g.fillStyle = m.color; rr(g, 10, e.cy - 11, 40, 22, 6); g.fill();
-    g.fillStyle = "#0b0f17"; g.font = `800 15px ${MONO}`; g.textAlign = "center"; g.fillText(m.number, 30, e.cy + 5);
+    const fs = Math.min(40, laneH - 6);
+    g.fillStyle = "#0b0f17"; g.beginPath(); g.arc(8 + fs / 2, e.cy, fs / 2 + 1, 0, 7); g.fill();
+    g.strokeStyle = m.color; g.lineWidth = 2; g.stroke();
+    g.drawImage(faceCanvas(m.color, m.legend), 10, e.cy - fs / 2 + 2, fs - 4, fs - 4);
     g.textAlign = "left"; g.fillStyle = m.legend ? "#ffd700" : "#e8eef9"; g.font = `600 ${laneH > 36 ? 15 : 13}px ${FONT}`;
-    g.fillText(e.tagName, 60, e.cy + 5);
+    g.fillText(e.tagName, 14 + fs, e.cy + 5);
     g.restore();
   }
-  const w = Math.max(11, Math.min(20, laneH * 0.46)), maxOff = laneH / 2 - w / 2 - 2;
+  const w = Math.max(13, Math.min(24, laneH * 0.5)), maxOff = laneH / 2 - w / 2 - 2;
   const px = (x) => X0 + (Math.min(x, L) / L) * (XEND - X0);
   for (const e of entries) {
     const s = sample(e, k), done = simT >= e.tEnd, st = e.result.status;
@@ -553,7 +627,7 @@ function drawFrame(simT, anim) {
       for (let i = 0; i < 4; i++) { g.fillStyle = `rgba(220,226,238,${0.34 * s.s * (1 - i / 4)})`; g.beginPath(); g.arc(cx - 34 - i * 7, cy + ((i * 37) % 5) - 2, 3 + i * 1.7, 0, 7); g.fill(); }
     }
     const crashed = done && st === "crash", dnf = done && st === "timeout";
-    drawCar(g, cx, cy, w, e.m.color, e.m.number, crashed ? (e.lane % 2 ? 0.55 : -0.55) : 0, dnf ? 0.45 : crashed ? 0.8 : 1);
+    drawCar(g, cx, cy, w, e.m.color, e.m.number, crashed ? (e.lane % 2 ? 0.55 : -0.55) : 0, dnf ? 0.45 : crashed ? 0.8 : 1, e.m.legend, simT, done ? 0 : s.v);
     g.textAlign = "center"; g.font = `600 11px ${FONT}`; g.lineWidth = 3; g.strokeStyle = "rgba(8,12,20,.9)";
     const label = surname(e.m.name); g.strokeText(label, cx - 17, cy - w / 2 - 4); g.fillStyle = e.m.legend ? "#ffd700" : "#e8eef9"; g.fillText(label, cx - 17, cy - w / 2 - 4);
     if (crashed) {
@@ -589,7 +663,7 @@ function updateTiming(simT, force) {
   rows.sort((a, b) => (a.fin !== b.fin ? (a.fin ? -1 : 1) : a.fin ? a.e.tEnd - b.e.tEnd : b.s.x - a.s.x));
   const lead = rows[0].s.x;
   timingRows(rows.map((r, i) => {
-    const st = r.e.result.status, base = { p: i + 1, name: r.e.m.name, color: r.e.m.color, num: r.e.m.number };
+    const st = r.e.result.status, base = { p: i + 1, name: r.e.m.name, color: r.e.m.color, face: faceURL(r.e.m) };
     if (r.fin) return { ...base, a: fmtT(R.cls.get(r.e.pid).time), b: "", d: "" };
     if (r.done) return { ...base, a: st === "crash" ? "CRASH" : "DNF", aCls: st === "crash" ? "bad" : "slow", b: "", d: "" };
     const gap = lead - r.s.x;
@@ -598,14 +672,14 @@ function updateTiming(simT, force) {
 }
 function showGrid(race) {
   const before = new Map(race.before.map((s) => [s.pid, s]));
-  timingRows(R.entries.map((e) => ({ p: e.lane, name: e.m.name, color: e.m.color, num: e.m.number,
+  timingRows(R.entries.map((e) => ({ p: e.lane, name: e.m.name, color: e.m.color, face: faceURL(e.m),
     a: `ELO ${Math.round((race.ratings_before || {})[e.pid] ?? (before.get(e.pid) || {}).rating ?? 1500)}`, b: "", d: "" })), false);
 }
 function showResults() {
   const race = R.race;
   timingRows(race.classification.map((c) => {
     const m = race.pilots[c.pid] || M(c.pid), fin = c.status === "finished", d = c.rating_delta;
-    return { p: c.pos, name: m.name, color: m.color, num: m.number,
+    return { p: c.pos, name: m.name, color: m.color, face: faceURL(m),
       a: fin ? fmtT(c.time) : c.status === "crash" ? "CRASH" : "DNF", aCls: fin ? "" : c.status === "crash" ? "bad" : "slow",
       b: fin && c.gap ? `+${c.gap.toFixed(2)}` : "", d: `${d >= 0 ? "+" : "−"}${Math.abs(d).toFixed(1)}`, dCls: d >= 0 ? "up" : "down" };
   }), true);
@@ -616,6 +690,7 @@ let bannerTimer = 0;
 function showBanner() {
   const w = R.winner; if (!w) return;
   const m = R.race.pilots[w.pid] || M(w.pid);
+  $("#banner-face").innerHTML = faceImg(m, 64);
   $("#banner-v").innerHTML = `#${m.number} ${esc(m.name)}<span>${fmtT(w.time)} s</span>`;
   $("#banner").classList.add("show"); clearTimeout(bannerTimer); bannerTimer = setTimeout(() => $("#banner").classList.remove("show"), 6000);
 }
@@ -632,8 +707,8 @@ function showPodium(race, live) {
     const pod = (c, cls) => {
       if (!c) return `<div class="pod ${cls}" style="visibility:hidden"></div>`;
       const m = race.pilots[c.pid] || M(c.pid);
-      return `<div class="pod ${cls}" style="--c:${m.color}"><div class="who"><span class="num">#${m.number}</span>
-        <div class="nm">${m.legend ? "★ " : ""}${esc(m.name)}</div><div class="tm">${fmtT(c.time)} s</div></div>
+      return `<div class="pod ${cls}" style="--c:${m.color}"><div class="who">${faceImg(m, c.pos === 1 ? 120 : 92)}
+        <div class="plate"><div class="nm"><span class="num">#${m.number}</span> ${m.legend ? "★ " : ""}${esc(m.name)}</div><div class="tm">${fmtT(c.time)} s</div></div></div>
         <div class="blk">${c.pos}</div></div>`;
     };
     $("#podium-body").innerHTML = `<div class="pods">${pod(fin[1], "p2")}${pod(fin[0], "p1")}${pod(fin[2], "p3")}</div>`;
@@ -688,12 +763,13 @@ function updateBetween(mode, v) {
     $("#bt-s").textContent = `Grand Prix ${nextGp}`; bar.style.width = lv.total ? (100 * (lv.done || 0) / lv.total) + "%" : "0";
     if (st && lv.phase === "training") {
       $("#bt-train").innerHTML = st.standings.filter((s) => !M(s.pid).legend).map((s) => {
-        const m = M(s.pid); return `<span class="tp ${done.has(s.pid) ? "done" : ""}" style="--c:${m.color}">#${m.number} ${esc(surname(m.name))}</span>`;
+        const m = M(s.pid); return `<span class="tp ${done.has(s.pid) ? "done" : ""}" style="--c:${m.color}">${faceImg(m, 28)}#${m.number} ${esc(surname(m.name))}</span>`;
       }).join("");
     }
   }
 }
 async function showCrown(ev) {
+  $("#crown-face").innerHTML = faceImg({ color: (G.meta[ev.pid] || {}).color || "#ffd700", legend: true }, 260);
   $("#crown-n").textContent = ev.name; $("#crown-t").textContent = `${ev.total.toFixed(2)} s`;
   $("#crown-s").textContent = "total over all five scenarios \u00b7 zero crashes";
   $("#crown").classList.add("show");
