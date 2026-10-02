@@ -18,34 +18,43 @@ from .train import run_baseline_episode, run_fly_episode
 from .learning import DopamineTracker, ValueDopamineTracker
 
 
-def eval_scenario(name, kwargs, brain, baseline, n_episodes, seed0):
-    env = DragStripEnv(**kwargs)
+def summarize(results):
+    finished = [r for r in results if r["phase"] == "finished"]
+    crashes = sum(1 for r in results if r["phase"] == "crash")
+    timeouts = sum(1 for r in results if r["phase"] == "racing")
+    n = len(results)
+    return {
+        "n": n,
+        "finished": len(finished),
+        "crashes": crashes,
+        "timeouts": timeouts,
+        "avg_time": stats.mean(r["elapsed_time"] for r in finished) if finished else None,
+        "best_time": min((r["elapsed_time"] for r in finished), default=None),
+    }
+
+
+def _eval_fly(env, brain, n_episodes, seed0):
     encoder = SenseEncoder()
     dlon, dlat = ValueDopamineTracker(N_PN), DopamineTracker()
-
-    fly_results = [
+    return summarize([
         run_fly_episode(env, brain, encoder, dlon, dlat, seed=seed0 + i, learn=False)
         for i in range(n_episodes)
-    ]
+    ])
+
+
+def eval_fly(kwargs, brain, n_episodes, seed0=20000):
+    """Fly-only half of eval_scenario -- the numbers a promotion is judged on
+    (same seeds, same procedure), without paying for the baseline."""
+    return _eval_fly(DragStripEnv(**kwargs), brain, n_episodes, seed0)
+
+
+def eval_scenario(name, kwargs, brain, baseline, n_episodes, seed0):
+    env = DragStripEnv(**kwargs)
+    fly = _eval_fly(env, brain, n_episodes, seed0)
     base_results = [
         run_baseline_episode(env, baseline, seed=seed0 + i) for i in range(n_episodes)
     ]
-
-    def summarize(results):
-        finished = [r for r in results if r["phase"] == "finished"]
-        crashes = sum(1 for r in results if r["phase"] == "crash")
-        timeouts = sum(1 for r in results if r["phase"] == "racing")
-        n = len(results)
-        return {
-            "n": n,
-            "finished": len(finished),
-            "crashes": crashes,
-            "timeouts": timeouts,
-            "avg_time": stats.mean(r["elapsed_time"] for r in finished) if finished else None,
-            "best_time": min((r["elapsed_time"] for r in finished), default=None),
-        }
-
-    return {"fly": summarize(fly_results), "baseline": summarize(base_results)}
+    return {"fly": fly, "baseline": summarize(base_results)}
 
 
 def main():

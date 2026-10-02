@@ -28,6 +28,9 @@ what worked, what didn't, and why.
   testing across uncertainty scenarios without retraining.
 - `flypilot/evaluate.py` — train one fly from scratch and compare it against
   the baseline.
+- `flypilot/league.py`, `flypilot/pilots.py`, `flypilot/web/` — the live
+  league for streaming training: named pilots, Elo ranking, race replays, and an
+  admin panel (see [Streaming](#streaming-the-training)).
 - `models/` — the deployed brain (`flypilot_brain.pkl`).
 - `results/` — its scenario results, the leaderboard of the run that produced
   it, and `evolution_log.json` (what each search round found).
@@ -55,6 +58,65 @@ python -m flypilot.evolve --population 16 --train-episodes 4000 --eval-episodes 
 # robustness across uncertainty scenarios (engine derate, traction loss/jitter)
 python -m flypilot.evaluate_scenarios --brain runs/my-run/best.pkl --out runs/my-run/scenario_results.json
 ```
+
+## Streaming the training
+
+```bash
+python -m flypilot.league
+```
+
+Then open the **admin panel** at `http://127.0.0.1:8765/admin` (local-only),
+press Start, and point OBS (Browser Source, 1920x1080) at
+`http://127.0.0.1:8765/`. Add `--autostart` to begin running on launch.
+
+A field of flies (11 learners plus the reigning champion as the "Legend") trains
+continuously. Each round (Grand Prix) is one training block per pilot followed by
+a frozen-policy race on shared conditions; finishing order updates an Elo rating,
+which is the pilot ranking. Every fly gets a stable, human-looking name, number
+and livery from its seed. At the end of each season the lowest-rated veteran
+retires and a rookie with a fresh random genome takes the seat.
+
+Rounds run back to back with no dead air: the next round trains while the page
+is still playing the current one (the page reports which round it shows, and
+training stays `lead_rounds` ahead of it). Each round has a start animation
+(title card, lane tags, cars rolling onto the grid), an end animation (flag
+wipe, podium, confetti) and a configurable countdown before the next one; if
+training is late the page shows a training-progress screen instead of a gap.
+
+The admin panel starts, pauses (after the current round) and resets the
+league and edits every setting: league size, training per round, season and
+retirement rules, pacing, and all broadcast timings. Settings are saved to
+`stream_data/settings.json`; each is marked as taking effect instantly, at the
+next round, or only for a new league. League state is checkpointed after every
+round in `stream_data/` (git-ignored), so a restart resumes where it stopped.
+The admin API only answers on loopback; use an SSH tunnel to reach it remotely.
+
+### Results are never lost, and the goal keeps running
+
+The league is not just a show: it keeps working on the project's goal, a
+better champion (zero crashes and a lower total avg_time over the five
+scenarios than `models/flypilot_brain.pkl`, the same criterion `search.py` uses).
+
+- **Contenders.** A fly that races close to the champion on the same conditions
+  (`verify_margin`) is saved to the hall of fame *in the exact state that
+  raced* (continued training is a random walk, so peaks are captured when they
+  happen) and verified in the background on all five scenarios with the same
+  seeds and procedure as the champion's numbers.
+- **Promotion.** A contender that really beats the champion becomes the new
+  champion: `models/flypilot_brain.pkl`, `results/scenario_results.json` and
+  `results/search_status.json` are updated (the previous champion is archived
+  first), the promotion is appended to `results/league_promotions.jsonl`, and
+  the fly is crowned the Legend on screen. Optional: commit (and push) the
+  promotion from the admin panel. `search.py` and the league share the same
+  champion files, so run one or the other, not both at once.
+- **Nothing is deleted.** Retired, removed, dethroned and crowned flies (full
+  learned state), previous champions, and every league that is reset or
+  restarted with `--fresh` are kept under `stream_data/archive/`. The league
+  checkpoint has a rolling backup and falls back to it if it can't be read.
+  Pausing waits for verifications already running.
+
+Every setting is also a command-line flag (`--stage-episodes`, `--pilots`,
+`--intermission-s`, ...; see `--help`), and flags override the saved settings.
 
 Run from the repo root (not inside `flypilot/`) so the `flypilot.*` module
 imports resolve. Promote a run's `best.pkl` by copying it to

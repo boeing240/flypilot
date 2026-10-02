@@ -39,7 +39,9 @@ def evaluate(brain: FlyBrain, env: DragStripEnv, encoder: SenseEncoder,
 
 def run_fly_episode(env: DragStripEnv, brain: FlyBrain, encoder: SenseEncoder,
                      dopamine_lon: ValueDopamineTracker, dopamine_lat: DopamineTracker,
-                     seed: int, learn: bool = True) -> dict:
+                     seed: int, learn: bool = True, on_tick=None) -> dict:
+    # on_tick(env, ticks), if given, runs after every env.step -- used to record
+    # a trajectory for replay without duplicating this loop.
     obs = env.reset(seed=seed)
     encoder.reset()
     brain.reset()
@@ -71,6 +73,8 @@ def run_fly_episode(env: DragStripEnv, brain: FlyBrain, encoder: SenseEncoder,
         total_reward += reward
         pending = (pn, info["reward_lon"], info["reward_lat"]) if not staged else None
         ticks += 1
+        if on_tick is not None:
+            on_tick(env, ticks)
         if done or ticks > 1500:  # 30s of race clock -- generous, real runs finish well under 15s
             if learn and pending is not None:
                 prev_pn, prev_r_lon, prev_r_lat = pending

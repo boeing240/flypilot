@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fly Pilot League &middot; Admin</title>
+<style>
+  :root {
+    --bg: #090d15; --panel: #111826; --panel-2: #172033; --line: #223048; --text: #e8eef9; --muted: #8497b5;
+    --gold: #ffd700; --up: #3ddc97; --down: #ff6b6b; --warn: #ffb020; --accent: #4f7cff;
+    --mono: "Cascadia Mono", Consolas, monospace; --sans: "Segoe UI", Inter, system-ui, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: radial-gradient(1000px 500px at 20% -10%, #14203a 0%, var(--bg) 60%); color: var(--text); font-family: var(--sans); min-height: 100vh; }
+  header { display: flex; align-items: center; gap: 18px; padding: 18px 28px; border-bottom: 1px solid var(--line); background: rgba(9,13,21,.8); position: sticky; top: 0; z-index: 3; backdrop-filter: blur(6px); }
+  header h1 { font-size: 20px; letter-spacing: .1em; text-transform: uppercase; }
+  header h1 small { color: var(--muted); font-weight: 400; letter-spacing: .12em; margin-left: 10px; }
+  header .sp { flex: 1; }
+  header a { color: #9fc0ff; text-decoration: none; font-size: 14px; padding: 7px 12px; border: 1px solid var(--line); border-radius: 8px; }
+  header a:hover { background: var(--panel-2); }
+  .pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; font-weight: 700; font-size: 13px; letter-spacing: .1em; text-transform: uppercase; background: #1b2433; color: #9fb4d6; border: 1px solid #2b3a55; }
+  .pill i { width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+  .pill.running { background: #0f2a1f; color: var(--up); border-color: #1f5a41; } .pill.running i { animation: pulse 1.2s infinite; }
+  .pill.pausing { background: #2e2410; color: var(--warn); border-color: #6b5320; }
+  @keyframes pulse { 50% { opacity: .25; } }
+  main { max-width: 1400px; margin: 0 auto; padding: 24px 28px 60px; display: grid; grid-template-columns: 400px 1fr; gap: 22px; align-items: start; }
+  @media (max-width: 1000px) { main { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; }
+  .card h2 { font-size: 13px; letter-spacing: .16em; color: var(--muted); text-transform: uppercase; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
+  .stack { display: grid; gap: 22px; }
+  .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  button { font: inherit; font-weight: 700; letter-spacing: .06em; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); border-radius: 10px; padding: 12px 14px; cursor: pointer; transition: background .15s, transform .05s, opacity .15s; }
+  button:hover:not(:disabled) { background: #1f2b44; } button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { opacity: .35; cursor: not-allowed; }
+  button.go { background: #12402c; border-color: #1f6a47; color: #b4f5d5; grid-column: 1 / 3; font-size: 17px; padding: 15px; }
+  button.go:hover:not(:disabled) { background: #185a3d; }
+  button.danger { border-color: #5e2530; color: #ff9aa6; background: #1f1217; grid-column: 1 / 3; }
+  button.danger:hover:not(:disabled) { background: #2e1820; }
+  button.save { background: #1b3270; border-color: #2c4fb3; color: #dbe6ff; width: 100%; font-size: 16px; padding: 14px; margin-top: 6px; }
+  button.save:hover:not(:disabled) { background: #234091; }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 9px 14px; font-size: 14px; }
+  .kv dt { color: var(--muted); } .kv dd { font-family: var(--mono); text-align: right; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #55627a; margin-right: 8px; }
+  .dot.on { background: var(--up); }
+  .progress { height: 8px; background: #1b2639; border-radius: 99px; overflow: hidden; margin-top: 14px; }
+  .progress > div { height: 100%; background: var(--up); width: 0; transition: width .4s; }
+  .group { margin-bottom: 22px; }
+  .group h3 { font-size: 14px; letter-spacing: .12em; color: #b9c9e4; text-transform: uppercase; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+  .field { display: grid; grid-template-columns: 1fr 150px; gap: 4px 16px; align-items: center; padding: 8px 0; }
+  .field label { font-size: 15px; font-weight: 600; }
+  .field .help { grid-column: 1; font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+  .field .ctl { grid-column: 2; grid-row: 1 / span 2; text-align: right; }
+  .field input[type=number], .field input[type=text] { width: 100%; font: inherit; font-family: var(--mono); background: #0c1320; color: var(--text); border: 1px solid #2a3b59; border-radius: 8px; padding: 8px 10px; text-align: right; }
+  .field input[type=text] { text-align: left; }
+  .field input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .field input.dirty { border-color: var(--warn); }
+  .field input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--accent); }
+  .tag { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; padding: 2px 7px; border-radius: 99px; margin-left: 8px; vertical-align: middle; border: 1px solid; font-weight: 700; }
+  .tag.live { color: var(--up); border-color: #1f5a41; } .tag.round { color: var(--warn); border-color: #6b5320; } .tag.reset { color: var(--down); border-color: #5e2530; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; font-size: 11.5px; letter-spacing: .12em; color: var(--muted); text-transform: uppercase; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  td { padding: 7px 8px; border-bottom: 1px solid #172033; font-family: var(--mono); } td.n { font-family: var(--sans); }
+  th.r, td.r { text-align: right; } tr.legend td { color: var(--gold); }
+  #log { background: #070b12; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; height: 260px; overflow-y: auto; font-family: var(--mono); font-size: 12.5px; line-height: 1.55; color: #b8c6de; white-space: pre-wrap; }
+  #toast { position: fixed; right: 24px; bottom: 24px; background: #12402c; border: 1px solid #1f6a47; color: #c9f7e0; padding: 12px 18px; border-radius: 10px; opacity: 0; transform: translateY(10px); transition: all .25s; pointer-events: none; max-width: 420px; z-index: 5; }
+  #toast.show { opacity: 1; transform: none; } #toast.err { background: #40121b; border-color: #7a2432; color: #ffc3cb; }
+  .note { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin-top: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Fly Pilot League <small>admin</small></h1>
+  <span class="pill" id="pill"><i></i><span id="pill-text">connecting</span></span>
+  <span class="sp"></span>
+  <a href="/" target="_blank">Open viewer &#8599;</a>
+</header>
+
+<main>
+  <div class="stack">
+    <section class="card">
+      <h2>Control</h2>
+      <div class="btns">
+        <button class="go" id="b-start">&#9654; Start</button>
+        <button id="b-pause">&#10074;&#10074; Pause after round</button>
+        <button id="b-save-top" title="same as Save settings">Save settings</button>
+        <button class="danger" id="b-reset">Reset league&hellip; (new pilots, rating zero)</button>
+      </div>
+      <p class="note">Pause lets the current round finish and be published, then stops. Everything is checkpointed after each round, so closing the program never loses a finished round.</p>
+    </section>
+
+    <section class="card">
+      <h2>Status</h2>
+      <dl class="kv">
+        <dt>Round</dt><dd id="s-gp">&ndash;</dd>
+        <dt>Season</dt><dd id="s-season">&ndash;</dd>
+        <dt>Phase</dt><dd id="s-phase">&ndash;</dd>
+        <dt>Episodes trained</dt><dd id="s-eps">&ndash;</dd>
+        <dt>Speed</dt><dd id="s-rate">&ndash;</dd>
+        <dt>Viewer</dt><dd id="s-viewer">&ndash;</dd>
+        <dt>Running for</dt><dd id="s-up">&ndash;</dd>
+      </dl>
+      <div class="progress"><div id="s-bar"></div></div>
+    </section>
+
+    <section class="card">
+      <h2>Champion goal <span id="goal-state" style="letter-spacing:.06em;text-transform:none"></span></h2>
+      <dl class="kv">
+        <dt>Champion (5-scenario total)</dt><dd id="g-champ">&ndash;</dd>
+        <dt>Contenders verified</dt><dd id="g-verified">&ndash;</dd>
+        <dt>Best contender</dt><dd id="g-best">&ndash;</dd>
+        <dt>Promotions</dt><dd id="g-promo">&ndash;</dd>
+        <dt>Saved brains</dt><dd id="g-arch">&ndash;</dd>
+      </dl>
+      <table id="g-table" style="margin-top:12px"><thead><tr><th>GP</th><th>Pilot</th><th class="r">Total</th><th class="r">vs champ</th><th class="r"></th></tr></thead><tbody id="g-rows"></tbody></table>
+      <p class="note">The goal: a brain with zero crashes and a lower 5-scenario total than the champion. Fast league flies are verified in the background exactly as search.py does; nothing is ever deleted &mdash; retired, replaced and dethroned flies and old champions are kept in <code>stream_data/archive/</code>.</p>
+    </section>
+
+    <section class="card">
+      <h2>Log</h2>
+      <div id="log"></div>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="card">
+      <h2>Settings <span id="dirty-note" style="color:var(--warn);letter-spacing:.06em;text-transform:none"></span></h2>
+      <div id="form"></div>
+      <button class="save" id="b-save">Save settings</button>
+      <p class="note">
+        <span class="tag live">instant</span> applies to the broadcast right away &nbsp;
+        <span class="tag round">next round</span> applies when the next round starts &nbsp;
+        <span class="tag reset">new league</span> only used when the league is reset.
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>Roster</h2>
+      <table><thead><tr><th>#</th><th>Pilot</th><th>Nat</th><th class="r">Rating</th><th class="r">Episodes</th><th class="r">Races</th><th class="r">Best</th></tr></thead>
+      <tbody id="roster"></tbody></table>
+    </section>
+  </div>
+</main>
+<div id="toast"></div>
+
+<script>
+"use strict";
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+let SPEC = null, STATUS = null;
+const dirty = new Set();
+
+async function api(url, body) {
+  const opt = body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json", "X-Admin": "1" }, body: JSON.stringify(body) };
+  const r = await fetch(url, { cache: "no-store", ...opt });
+  if (!r.ok) throw new Error(`${r.status} ${(await r.json().catch(() => ({}))).error || ""}`);
+  return r.json();
+}
+let toastTimer;
+function toast(msg, err) {
+  const t = $("#toast"); t.textContent = msg; t.className = "show" + (err ? " err" : "");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.className = ""), 3800);
+}
+
+/* ---------- settings form (built once from the server's spec) ---------- */
+function buildForm() {
+  const groups = [...new Set(SPEC.map((s) => s.group))];
+  $("#form").innerHTML = groups.map((g) => `<div class="group"><h3>${esc(g)}</h3>` + SPEC.filter((s) => s.group === g).map((s) => {
+    const tag = `<span class="tag ${s.apply}">${s.apply === "live" ? "instant" : s.apply === "round" ? "next round" : "new league"}</span>`;
+    let ctl;
+    if (s.type === "bool") ctl = `<input type="checkbox" id="f-${s.key}" data-key="${s.key}">`;
+    else if (s.type === "text") ctl = `<input type="text" id="f-${s.key}" data-key="${s.key}" maxlength="60">`;
+    else ctl = `<input type="number" id="f-${s.key}" data-key="${s.key}" min="${s.min}" max="${s.max}" step="${s.step || (s.type === "int" ? 1 : "any")}">`;
+    return `<div class="field"><label for="f-${s.key}">${esc(s.label)}${tag}</label><div class="ctl">${ctl}</div><div class="help">${esc(s.help)}</div></div>`;
+  }).join("") + "</div>").join("");
+  document.querySelectorAll("#form input").forEach((el) => {
+    const mark = () => { dirty.add(el.dataset.key); el.classList.add("dirty"); $("#dirty-note").textContent = "unsaved changes"; };
+    el.addEventListener("input", mark); el.addEventListener("change", mark);
+  });
+}
+function fillForm(values) {
+  for (const s of SPEC) {
+    const el = document.getElementById("f-" + s.key);
+    if (!el || dirty.has(s.key)) continue;
+    if (s.type === "bool") el.checked = !!values[s.key]; else if (document.activeElement !== el) el.value = values[s.key];
+  }
+}
+function collect() {
+  const out = {};
+  for (const s of SPEC) {
+    const el = document.getElementById("f-" + s.key);
+    out[s.key] = s.type === "bool" ? el.checked : el.value;
+  }
+  return out;
+}
+async function save() {
+  try {
+    const r = await api("/api/admin/settings", collect());
+    dirty.clear(); document.querySelectorAll("#form input.dirty").forEach((e) => e.classList.remove("dirty")); $("#dirty-note").textContent = "";
+    let msg = r.changed.length ? `Saved: ${r.changed.join(", ")}` : "Nothing changed";
+    if (r.reset_needed.length) msg += `  (${r.reset_needed.join(", ")} apply after a league reset)`;
+    toast(msg); refresh();
+  } catch (e) { toast("Save failed: " + e.message, true); }
+}
+
+/* ---------- actions ---------- */
+async function act(action) {
+  try { const r = await api("/api/admin/action", { action }); toast(r.result); refresh(); }
+  catch (e) { toast("Failed: " + e.message, true); }
+}
+$("#b-start").onclick = () => act("start");
+$("#b-pause").onclick = () => act("pause");
+$("#b-save").onclick = save; $("#b-save-top").onclick = save;
+$("#b-reset").onclick = () => {
+  if (confirm("Reset the league?\n\nAll pilots, brains, ratings and race history are deleted and a new field is created.\nSettings are kept.")) act("reset");
+};
+
+/* ---------- status ---------- */
+const fmtDur = (s) => { s = Math.floor(s); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h ? `${h}h ${m}m` : `${m}m ${s % 60}s`; };
+function render(st) {
+  STATUS = st;
+  const pill = $("#pill"); pill.className = "pill " + st.status;
+  $("#pill-text").textContent = st.status === "running" ? "running" : st.status === "pausing" ? "pausing after round" : "stopped";
+  $("#b-start").disabled = st.status === "running";
+  $("#b-start").innerHTML = st.status === "pausing" ? "&#9654; Resume" : "&#9654; Start";
+  $("#b-pause").disabled = st.status !== "running";
+  $("#b-reset").disabled = st.status !== "stopped";
+  const lv = st.live || {};
+  $("#s-gp").textContent = st.gp ? `${st.gp} done` : "none yet";
+  $("#s-season").textContent = `${st.season} (round ${st.season_gp + 1}/${st.settings.retire_every})`;
+  const phase = { verifying: "finishing verifications", training: `training ${lv.done || 0}/${lv.total || 0}`, waiting: "round ready, waiting for the page", stopped: "stopped", paused: "paused" }[st.phase] || st.phase;
+  $("#s-phase").textContent = phase;
+  $("#s-eps").textContent = (lv.episodes || 0).toLocaleString("en-US");
+  $("#s-rate").textContent = `${lv.eps_per_s || 0} eps/s`;
+  $("#s-viewer").innerHTML = `<span class="dot ${st.viewer.connected ? "on" : ""}"></span>${st.viewer.connected ? "connected, round " + st.viewer.gp : "no page open"}`;
+  $("#s-up").textContent = st.uptime ? fmtDur(st.uptime) : "–";
+  $("#s-bar").style.width = st.phase === "training" && lv.total ? (100 * lv.done / lv.total) + "%" : "0";
+  fillForm(st.settings);
+  $("#roster").innerHTML = st.pilots.map((p, i) => `<tr class="${p.legend ? "legend" : ""}"><td>${p.number}</td><td class="n">${p.legend ? "★ " : ""}${esc(p.name)}</td><td>${p.nation}</td><td class="r">${Math.round(p.rating)}</td><td class="r">${p.episodes.toLocaleString("en-US")}</td><td class="r">${p.races}</td><td class="r">${p.pb ? p.pb.toFixed(2) : "–"}</td></tr>`).join("");
+  const g = st.goal || {};
+  $("#g-champ").textContent = g.champion_total ? `${g.champion_total.toFixed(2)} s · ${g.champion_crashes} crashes` : "unknown";
+  $("#g-verified").textContent = `${g.verified || 0}${g.pending ? ` (+${g.pending} running)` : ""}`;
+  $("#g-best").textContent = g.best ? `${g.best.total.toFixed(2)} s (${g.best.delta >= 0 ? "+" : "−"}${Math.abs(g.best.delta).toFixed(2)})` : "–";
+  $("#g-promo").textContent = g.promotions || 0;
+  const a = g.archive || {};
+  $("#g-arch").textContent = `${a.pilots || 0} pilots · ${a.champions || 0} champions · ${a.contenders || 0} contenders`;
+  $("#goal-state").textContent = g.verify === false ? "(verification off)" : "";
+  $("#g-rows").innerHTML = (g.recent || []).map((h) => {
+    const verdict = h.promoted ? `<span style="color:var(--gold)">NEW CHAMPION</span>` : h.status === "pending" ? `<span style="color:var(--warn)">checking&hellip;</span>`
+      : h.crashes ? `<span style="color:var(--down)">${h.crashes} crashes</span>` : `<span style="color:var(--muted)">short</span>`;
+    const d = h.delta === null || h.delta === undefined ? "–" : `${h.delta >= 0 ? "+" : "−"}${Math.abs(h.delta).toFixed(2)}`;
+    return `<tr><td>${h.gp}</td><td class="n">${esc(h.name)}</td><td class="r">${h.total ? h.total.toFixed(2) : "–"}</td><td class="r">${d}</td><td class="r">${verdict}</td></tr>`;
+  }).join("") || `<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:14px">no contenders yet</td></tr>`;
+  const log = $("#log"), atEnd = log.scrollTop + log.clientHeight >= log.scrollHeight - 30;
+  log.textContent = st.log.join("\n"); if (atEnd) log.scrollTop = log.scrollHeight;
+}
+async function refresh() {
+  try {
+    const st = await api("/api/admin/status");
+    if (!SPEC) { SPEC = st.spec; buildForm(); }
+    render(st);
+  } catch (e) { $("#pill").className = "pill"; $("#pill-text").textContent = "no connection"; }
+}
+refresh(); setInterval(refresh, 1500);
+</script>
+</body>
+</html>

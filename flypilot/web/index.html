@@ -1,0 +1,859 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fly Pilot League</title>
+<style>
+  :root {
+    --bg: #090d15; --panel: #111826; --panel-2: #172033; --line: #223048;
+    --text: #e8eef9; --muted: #8497b5; --gold: #ffd700; --up: #3ddc97; --down: #ff6b6b;
+    --mono: "Cascadia Mono", "Consolas", "SF Mono", monospace;
+    --sans: "Segoe UI", Inter, system-ui, -apple-system, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; background: #000; overflow: hidden; font-family: var(--sans); color: var(--text); }
+  #stage {
+    position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px; transform-origin: center center;
+    background: radial-gradient(1200px 700px at 30% 0%, #131c2e 0%, var(--bg) 60%);
+    overflow: hidden;
+  }
+  .panel { position: absolute; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .panel > h2 {
+    font-size: 15px; font-weight: 700; letter-spacing: .16em; color: var(--muted);
+    padding: 14px 18px 8px; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center;
+  }
+  .panel > h2 .tag { font-size: 13px; letter-spacing: .1em; color: var(--gold); }
+
+  /* ---------- header ---------- */
+  #top { position: absolute; left: 24px; top: 14px; width: 1872px; height: 72px; display: flex; align-items: center; gap: 28px; }
+  .brand { display: flex; align-items: center; gap: 14px; min-width: 470px; }
+  .brand-name { font-size: 30px; font-weight: 800; letter-spacing: .08em; line-height: 1; }
+  .brand-sub { font-size: 14px; color: var(--muted); letter-spacing: .12em; margin-top: 6px; text-transform: uppercase; }
+  #gpinfo { flex: 1; min-width: 0; }
+  #gp-title { font-size: 30px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #gp-chips { display: flex; gap: 8px; margin-top: 6px; }
+  .chip-pill { font-size: 13px; padding: 3px 10px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line); color: #c7d4ea; letter-spacing: .05em; }
+  .chip-pill.warn { color: #ffb86b; border-color: #5c4326; }
+  .chip-pill.cold { color: #8fd3ff; border-color: #29506b; }
+  #top-right { text-align: right; min-width: 520px; }
+  #mode-tag { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; letter-spacing: .14em; font-size: 18px; padding: 6px 14px; border-radius: 8px; background: #3a1018; color: #ff6b81; border: 1px solid #66202c; }
+  #mode-tag .dot { width: 10px; height: 10px; border-radius: 50%; background: currentColor; animation: pulse 1.2s infinite; }
+  #mode-tag.replay { background: #1b2433; color: #9fb4d6; border-color: #2b3a55; }
+  #mode-tag.replay .dot { animation: none; opacity: .5; }
+  @keyframes pulse { 50% { opacity: .25; } }
+  #season-info { margin-top: 8px; font-size: 15px; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; }
+  #record-info { font-size: 14px; color: #b9c7de; margin-top: 3px; }
+  #record-info b { color: var(--gold); font-family: var(--mono); }
+
+  /* ---------- ranking ---------- */
+  #rank { left: 24px; top: 100px; width: 540px; height: 880px; }
+  #rank .head { display: flex; padding: 0 18px 6px; font-size: 12px; letter-spacing: .12em; color: #61738f; text-transform: uppercase; }
+  #rank .head span { text-align: center; }
+  #rank-rows { position: absolute; left: 12px; right: 12px; top: 76px; bottom: 8px; }
+  .row {
+    position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; gap: 10px; padding: 0 12px 0 0;
+    background: var(--panel-2); border-radius: 10px; overflow: hidden; border-left: 5px solid var(--c, #888);
+    transition: transform .9s cubic-bezier(.3,.8,.25,1), opacity .6s, height .4s;
+  }
+  .row.legend { background: linear-gradient(90deg, #2b2610 0%, var(--panel-2) 70%); box-shadow: inset 0 0 0 1px #6b5a14; }
+  .row .pos { width: 34px; text-align: center; font-family: var(--mono); font-size: 20px; font-weight: 700; color: #b6c4dc; }
+  .row .num { width: 42px; height: 28px; border-radius: 7px; background: var(--c); color: #0b0f17; font-weight: 800; font-family: var(--mono); font-size: 16px; display: flex; align-items: center; justify-content: center; flex: none; }
+  .row .who { flex: 1; min-width: 0; }
+  .row .nm { font-size: 19px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .sub { font-size: 12px; color: var(--muted); letter-spacing: .06em; margin-top: 2px; white-space: nowrap; }
+  .row.legend .nm::before { content: "\2605  "; color: var(--gold); }
+  .row .form { display: flex; gap: 4px; width: 62px; justify-content: flex-end; flex: none; }
+  .row .form i { width: 9px; height: 9px; border-radius: 50%; background: #2a3750; }
+  .row .form i.W { background: var(--gold); } .row .form i.F { background: var(--up); }
+  .row .form i.C { background: var(--down); } .row .form i.T { background: #6b7a93; }
+  .row .pb { width: 64px; text-align: right; font-family: var(--mono); font-size: 16px; color: #c9d6ec; flex: none; }
+  .row .elo { width: 92px; text-align: right; flex: none; }
+  .row .elo b { display: block; font-family: var(--mono); font-size: 21px; font-weight: 700; }
+  .row .elo .dl { font-family: var(--mono); font-size: 12px; height: 14px; }
+  .dl.up { color: var(--up); } .dl.down { color: var(--down); }
+
+  /* ---------- track ---------- */
+  #trackp { left: 580px; top: 100px; width: 1316px; height: 560px; background: #0e1522; }
+  #track { position: absolute; left: 0; top: 0; width: 1316px; height: 560px; }
+  #card {
+    position: absolute; left: 0; right: 0; top: 150px; margin: auto; width: 760px; text-align: center; padding: 26px 30px 24px;
+    background: rgba(8,12,20,.86); border: 1px solid #2b3d5c; border-radius: 16px; opacity: 0; transform: scale(.96);
+    transition: opacity .5s, transform .5s; pointer-events: none; backdrop-filter: blur(4px);
+  }
+  #card.show { opacity: 1; transform: scale(1); }
+  #card .k { font-size: 16px; letter-spacing: .3em; color: var(--muted); text-transform: uppercase; }
+  #card .t { font-size: 46px; font-weight: 800; letter-spacing: .05em; margin: 8px 0 12px; text-transform: uppercase; }
+  #card .chips { display: flex; justify-content: center; gap: 10px; }
+  #banner {
+    position: absolute; left: 0; right: 0; bottom: 18px; margin: auto; width: 840px; text-align: center; padding: 14px 24px;
+    background: linear-gradient(90deg, #3a3008, #1b1604 55%, #3a3008); border: 1px solid #8a7410; border-radius: 14px;
+    opacity: 0; transform: translateY(14px); transition: opacity .5s, transform .5s; pointer-events: none;
+  }
+  #banner.show { opacity: 1; transform: none; }
+  #banner .k { font-size: 14px; letter-spacing: .3em; color: #d9c44a; }
+  #banner .v { font-size: 32px; font-weight: 800; margin-top: 2px; }
+  #banner .v span { font-family: var(--mono); color: var(--gold); margin-left: 12px; }
+
+  /* ---------- round animations ---------- */
+  #wipe { position: absolute; top: 0; bottom: 0; left: 0; width: 30%; opacity: 0; pointer-events: none; z-index: 4;
+    background: repeating-conic-gradient(#f4f7fb 0% 25%, #0b0f17 0% 50%) 0 0 / 56px 56px; box-shadow: 0 0 60px rgba(0,0,0,.7); transform: translateX(-110%); }
+  #wipe.go { animation: wipe 1.15s cubic-bezier(.55,0,.35,1) forwards; }
+  @keyframes wipe { 0% { opacity: 1; transform: translateX(-110%); } 100% { opacity: 1; transform: translateX(370%); } }
+  #sweep { position: absolute; inset: 0; pointer-events: none; z-index: 3; transform: translateX(-100%);
+    background: linear-gradient(100deg, transparent 38%, rgba(255,255,255,.2) 50%, transparent 62%); }
+  #sweep.go { animation: sweep 1s ease-out forwards; }
+  @keyframes sweep { to { transform: translateX(100%); } }
+  #podium { position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at center, rgba(8,12,20,.8), rgba(8,12,20,.93)); opacity: 0; pointer-events: none; transition: opacity .5s; }
+  #podium.show { opacity: 1; }
+  #podium .pk { font-size: 15px; letter-spacing: .34em; color: var(--muted); margin-bottom: 14px; text-transform: uppercase; }
+  #podium .none { font-size: 38px; font-weight: 800; letter-spacing: .1em; color: #9aa8bf; }
+  #podium .pods { display: flex; align-items: flex-end; gap: 16px; }
+  .pod { width: 250px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; opacity: 0; transform: translateY(90px); }
+  #podium.show .pod { animation: rise .85s cubic-bezier(.2,.9,.25,1.08) forwards; }
+  .pod.p3 { animation-delay: .1s !important; } .pod.p2 { animation-delay: .5s !important; } .pod.p1 { animation-delay: .95s !important; }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+  .pod .who { text-align: center; margin-bottom: 10px; max-width: 100%; }
+  .pod .num { display: inline-block; min-width: 46px; padding: 3px 10px; border-radius: 7px; background: var(--c); color: #0b0f17; font-family: var(--mono); font-weight: 800; font-size: 18px; }
+  .pod .nm { font-size: 22px; font-weight: 700; margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pod.p1 .nm { font-size: 27px; }
+  .pod .tm { font-family: var(--mono); font-size: 24px; color: var(--gold); margin-top: 2px; }
+  .pod .blk { width: 100%; border-radius: 10px 10px 0 0; display: flex; justify-content: center; padding-top: 8px; font-size: 44px; font-weight: 800; color: rgba(8,12,20,.55); background: var(--c); }
+  .pod.p1 .blk { height: 150px; } .pod.p2 .blk { height: 108px; } .pod.p3 .blk { height: 76px; }
+  #confetti { position: absolute; left: 0; top: 0; width: 1316px; height: 560px; z-index: 6; pointer-events: none; }
+  #between { position: absolute; left: 0; right: 0; top: 0; bottom: 0; z-index: 4; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    background: rgba(8,12,20,.8); opacity: 0; pointer-events: none; transition: opacity .5s; backdrop-filter: blur(3px); }
+  #between.show { opacity: 1; }
+  #between .bk { font-size: 17px; letter-spacing: .34em; color: var(--muted); text-transform: uppercase; }
+  #between .bn { font-family: var(--mono); font-size: 120px; font-weight: 800; line-height: 1; color: #fff; text-shadow: 0 0 40px rgba(79,124,255,.45); }
+  #between .bn.small { font-size: 56px; }
+  #between .bs { font-size: 20px; letter-spacing: .1em; color: #b9c9e4; text-transform: uppercase; }
+  #between .bbar { width: 420px; height: 6px; background: #1b2639; border-radius: 99px; overflow: hidden; margin-top: 10px; }
+  #between .bbar > div { height: 100%; width: 0; background: var(--accent); }
+  #between .btrain { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 900px; margin-top: 14px; }
+  .tp { font-size: 15px; padding: 5px 12px; border-radius: 99px; background: #172033; border: 1px solid var(--line); color: #7b8ca8; border-left: 4px solid var(--c); }
+  .tp.done { color: #e8eef9; background: #11301f; border-color: #1f5a41; border-left-color: var(--c); }
+
+  #crown { position: absolute; inset: 0; z-index: 7; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+    background: radial-gradient(circle at center, rgba(78,60,4,.94), rgba(8,12,20,.97) 75%); opacity: 0; pointer-events: none; transition: opacity .6s; }
+  #crown.show { opacity: 1; }
+  #crown .ck { font-size: 20px; letter-spacing: .5em; color: #e6cf55; }
+  #crown .cn { font-size: 66px; font-weight: 800; color: #fff; text-shadow: 0 0 44px rgba(255,215,0,.65); text-align: center; padding: 0 30px; }
+  #crown .ct { font-family: var(--mono); font-size: 48px; color: var(--gold); }
+  #crown .cs { font-size: 20px; letter-spacing: .1em; color: #cdbb66; text-transform: uppercase; }
+
+  /* ---------- timing ---------- */
+  #timing { left: 580px; top: 676px; width: 560px; height: 304px; }
+  #timing-rows { position: absolute; left: 12px; right: 12px; top: 44px; bottom: 8px; }
+  .tr { position: absolute; left: 0; right: 0; display: flex; align-items: center; gap: 8px; font-size: 14px; border-radius: 6px; padding: 0 8px; transition: transform .25s; }
+  .tr:nth-child(odd) { background: rgba(255,255,255,.025); }
+  .tr .p { width: 24px; font-family: var(--mono); font-weight: 700; color: #b6c4dc; text-align: right; }
+  .tr .c { width: 34px; height: 15px; border-radius: 4px; font-family: var(--mono); font-size: 11px; font-weight: 800; color: #0b0f17; display: flex; align-items: center; justify-content: center; flex: none; }
+  .tr .n { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tr .a { width: 84px; text-align: right; font-family: var(--mono); }
+  .tr .b { width: 76px; text-align: right; font-family: var(--mono); color: var(--muted); }
+  .tr .d { width: 64px; text-align: right; font-family: var(--mono); }
+  .tr.first .a { color: var(--gold); font-weight: 700; }
+  .tr .bad { color: var(--down); } .tr .slow { color: #9aa8bf; }
+
+  /* ---------- chart ---------- */
+  #chartp { left: 1156px; top: 676px; width: 740px; height: 304px; }
+  #chart { position: absolute; left: 0; top: 40px; width: 740px; height: 264px; }
+
+  /* ---------- ticker ---------- */
+  #ticker { position: absolute; left: 24px; top: 996px; width: 1872px; height: 60px; display: flex; align-items: stretch; gap: 14px; }
+  #ticker > div { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; display: flex; align-items: center; }
+  #train-status { padding: 0 20px; min-width: 520px; gap: 16px; font-size: 16px; letter-spacing: .08em; white-space: nowrap; }
+  #train-status .lbl { color: var(--muted); text-transform: uppercase; font-size: 13px; letter-spacing: .14em; }
+  #train-status .bar { display: flex; gap: 3px; }
+  #train-status .bar i { width: 14px; height: 18px; border-radius: 3px; background: #243049; }
+  #train-status .bar i.on { background: var(--up); }
+  #marq { flex: 1; overflow: hidden; position: relative; }
+  #marq-inner { display: inline-block; white-space: nowrap; font-size: 19px; color: #d6e1f3; padding-left: 20px; animation: marq 90s linear infinite; will-change: transform; }
+  #marq-inner b { color: var(--gold); font-weight: 700; }
+  @keyframes marq { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  #totals { padding: 0 20px; min-width: 440px; justify-content: flex-end; font-family: var(--mono); font-size: 16px; color: #c3d0e6; gap: 18px; }
+  #totals b { color: #fff; }
+  #wait { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 14px; background: rgba(9,13,21,.9); font-size: 34px; font-weight: 700; letter-spacing: .12em; z-index: 5; text-transform: uppercase; }
+  #wait small { font-size: 18px; color: var(--muted); letter-spacing: .1em; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="top">
+    <div class="brand">
+      <svg viewBox="0 0 48 48" width="52" height="52" aria-hidden="true">
+        <ellipse cx="14" cy="25" rx="10" ry="5" transform="rotate(-35 14 25)" fill="#8fd3ff" opacity=".65"/>
+        <ellipse cx="34" cy="25" rx="10" ry="5" transform="rotate(35 34 25)" fill="#8fd3ff" opacity=".65"/>
+        <ellipse cx="24" cy="31" rx="7" ry="12" fill="#ffd700"/>
+        <circle cx="24" cy="15" r="6.5" fill="#ffd700"/>
+        <circle cx="21" cy="14" r="2.4" fill="#e5334b"/><circle cx="27" cy="14" r="2.4" fill="#e5334b"/>
+      </svg>
+      <div><div class="brand-name" id="league-name">FLY PILOT LEAGUE</div><div class="brand-sub">tiny brains learning to drive &middot; live</div></div>
+    </div>
+    <div id="gpinfo"><div id="gp-title">Connecting&hellip;</div><div id="gp-chips"></div></div>
+    <div id="top-right">
+      <span id="mode-tag" class="replay"><span class="dot"></span><span id="mode-text">STANDBY</span></span>
+      <div id="season-info"></div>
+      <div id="record-info"></div>
+    </div>
+  </div>
+
+  <section id="rank" class="panel">
+    <h2>Pilot ranking <span class="tag">ELO</span></h2>
+    <div class="head"><span style="width:34px">#</span><span style="width:52px"></span><span style="flex:1;text-align:left">Pilot</span><span style="width:62px">Form</span><span style="width:64px">Best</span><span style="width:92px">Rating</span></div>
+    <div id="rank-rows"></div>
+  </section>
+
+  <section id="trackp" class="panel">
+    <canvas id="track"></canvas>
+    <div id="card"><div class="k" id="card-k"></div><div class="t" id="card-t"></div><div class="chips" id="card-chips"></div></div>
+    <div id="banner"><div class="k">WINNER</div><div class="v" id="banner-v"></div></div>
+    <div id="sweep"></div><div id="wipe"></div>
+    <div id="podium"><div class="pk" id="podium-k"></div><div id="podium-body"></div></div>
+    <div id="between"><div class="bk" id="bt-k"></div><div class="bn" id="bt-n"></div><div class="bs" id="bt-s"></div>
+      <div class="bbar"><div id="bt-bar"></div></div><div class="btrain" id="bt-train"></div></div>
+    <div id="crown"><div class="ck">NEW CHAMPION</div><div class="cn" id="crown-n"></div><div class="ct" id="crown-t"></div><div class="cs" id="crown-s"></div></div>
+    <canvas id="confetti"></canvas>
+  </section>
+
+  <section id="timing" class="panel">
+    <h2><span id="timing-title">Live timing</span><span class="tag" id="timing-tag"></span></h2>
+    <div id="timing-rows"></div>
+  </section>
+
+  <section id="chartp" class="panel">
+    <h2>Rating progress &middot; chasing the Legend</h2>
+    <canvas id="chart"></canvas>
+  </section>
+
+  <div id="ticker">
+    <div id="train-status"></div>
+    <div id="marq"><div id="marq-inner"></div></div>
+    <div id="totals"></div>
+  </div>
+  <div id="wait"><div id="wait-main">Waiting for the first Grand Prix</div><small id="wait-sub">pilots are warming up their brains&hellip;</small></div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================ helpers */
+const $ = (s) => document.querySelector(s);
+const SC = 2;                      // canvas supersampling (stage is CSS-scaled)
+const FONT = '"Segoe UI", Inter, system-ui, Arial, sans-serif';
+const MONO = '"Cascadia Mono", Consolas, monospace';
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const lerp = (a, b, f) => a + (b - a) * f;
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const ease = (x) => 1 - Math.pow(1 - clamp(x), 3);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const fmtT = (t) => t.toFixed(2);
+const surname = (n) => n.split(" ").slice(1).join(" ") || n;
+const frame = () => new Promise((r) => requestAnimationFrame(r));
+
+// Broadcast timing comes from the admin panel (live.json); these are the fallbacks.
+const BC_DEFAULT = { intro_s: 4.5, staging_s: 2, podium_s: 8, intermission_s: 8, fast_forward: 4, animations: true, idle_replays: false, lead_rounds: 2 };
+const G = { state: null, live: null, meta: {}, races: new Map(), queue: [], lastGp: -1, rankLocked: false, rows: new Map(),
+            lastReplay: null, shownGp: 0, hbGp: 0, everPlayed: false, initialReplay: true, records: {} };
+const bc = () => ({ ...BC_DEFAULT, ...((G.live && G.live.broadcast) || {}) });
+const M = (pid) => G.meta[pid] || { name: pid, nation: "", number: 0, color: "#888", legend: false };
+
+function fit() {
+  const s = Math.min(innerWidth / 1920, innerHeight / 1080);
+  $("#stage").style.transform = `translate(-50%, -50%) scale(${s})`;
+}
+addEventListener("resize", fit); fit();
+
+async function jget(url) {
+  const r = await fetch(url + "?t=" + Date.now(), { cache: "no-store" });
+  if (!r.ok) throw new Error(url + " " + r.status);
+  return r.json();
+}
+function setupCanvas(cv, w, h) {
+  cv.width = w * SC; cv.height = h * SC;
+  const g = cv.getContext("2d"); g.setTransform(SC, 0, 0, SC, 0, 0); return g;
+}
+function rr(g, x, y, w, h, r) {
+  g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+}
+
+/* ============================================================ ranking panel */
+const RANK_AREA = 800;
+function makeRow() {
+  const el = document.createElement("div");
+  el.className = "row";
+  el.innerHTML = `<div class="pos"></div><div class="num"></div><div class="who"><div class="nm"></div><div class="sub"></div></div>
+    <div class="form"></div><div class="pb"></div><div class="elo"><b></b><div class="dl"></div></div>`;
+  const q = (s) => el.querySelector(s);
+  return { el, pos: q(".pos"), num: q(".num"), nm: q(".nm"), sub: q(".sub"), form: q(".form"), pb: q(".pb"), elo: q(".elo b"), dl: q(".dl"),
+           shown: null, raf: 0 };
+}
+function tweenNumber(row, target) {
+  if (row.shown === null) { row.shown = target; row.elo.textContent = Math.round(target); return; }
+  cancelAnimationFrame(row.raf);
+  const from = row.shown, t0 = performance.now(), dur = 1400;
+  const step = (now) => {
+    const f = Math.min(1, (now - t0) / dur);
+    row.shown = lerp(from, target, ease(f)); row.elo.textContent = Math.round(row.shown);
+    if (f < 1) row.raf = requestAnimationFrame(step);
+  };
+  row.raf = requestAnimationFrame(step);
+}
+function renderRank(snap) {
+  const n = snap.length, rowH = Math.min(64, Math.floor(RANK_AREA / Math.max(n, 1)));
+  const seen = new Set();
+  for (const s of snap) {
+    seen.add(s.pid);
+    const m = M(s.pid);
+    let row = G.rows.get(s.pid);
+    if (!row) {
+      row = makeRow(); G.rows.set(s.pid, row); $("#rank-rows").appendChild(row.el);
+      row.el.style.transition = "none"; row.el.style.opacity = 0;
+      row.el.style.transform = `translateY(${(s.rank - 1) * rowH + 40}px)`;
+      void row.el.offsetWidth; row.el.style.transition = ""; row.el.style.opacity = 1;
+    }
+    row.el.style.height = rowH - 6 + "px";
+    row.el.style.transform = `translateY(${(s.rank - 1) * rowH}px)`;
+    row.el.style.setProperty("--c", m.color);
+    row.el.classList.toggle("legend", !!m.legend);
+    row.pos.textContent = s.rank;
+    row.num.textContent = m.number;
+    row.nm.textContent = m.name;
+    row.sub.textContent = `${m.nation}  ·  ${s.episodes.toLocaleString("en-US")} eps${m.legend ? "  ·  reigning champion" : ""}`;
+    row.pb.textContent = s.pb ? s.pb.toFixed(2) : "–";
+    const f = s.form.slice(-5);
+    row.form.innerHTML = Array.from({ length: 5 - f.length }, () => "<i></i>").join("") + f.map((c) => `<i class="${c}"></i>`).join("");
+    tweenNumber(row, s.rating);
+    const d = s.delta;
+    row.dl.className = "dl " + (d > 0.05 ? "up" : d < -0.05 ? "down" : "");
+    row.dl.textContent = d > 0.05 ? `▲ ${d.toFixed(1)}` : d < -0.05 ? `▼ ${Math.abs(d).toFixed(1)}` : "";
+  }
+  for (const [pid, row] of G.rows) if (!seen.has(pid)) {
+    row.el.style.opacity = 0; setTimeout(() => row.el.remove(), 800); G.rows.delete(pid);
+  }
+}
+
+/* ============================================================ rating chart */
+// src = { standings, history, maxGp } -- the chart follows the round on screen, never runs ahead of it
+function renderChart(src) {
+  if (!src) return;
+  const cv = $("#chart"), W = 740, H = 264;
+  const g = setupCanvas(cv, W, H);
+  g.clearRect(0, 0, W, H);
+  const hist = (pid) => (src.history[pid] || []).filter(([gp]) => gp <= src.maxGp);
+  const stand = src.standings;
+  const legend = stand.find((s) => M(s.pid).legend);
+  const sel = [legend, ...stand.filter((s) => !M(s.pid).legend).slice(0, 5)].filter(Boolean);
+  let gmin = Infinity, gmax = -Infinity, rmin = Infinity, rmax = -Infinity;
+  for (const s of sel) for (const [gp, r] of hist(s.pid)) {
+    gmin = Math.min(gmin, gp); gmax = Math.max(gmax, gp); rmin = Math.min(rmin, r); rmax = Math.max(rmax, r);
+  }
+  if (!(gmax - gmin >= 1)) {
+    g.fillStyle = "#61738f"; g.font = `15px ${FONT}`; g.textAlign = "center";
+    g.fillText("Rating history builds up as Grands Prix finish", W / 2, H / 2); return;
+  }
+  gmin = Math.max(gmin, gmax - 59);
+  rmin = Math.floor((rmin - 12) / 10) * 10; rmax = Math.ceil((rmax + 12) / 10) * 10;
+  const L = 52, R = 168, T = 12, B = 26, pw = W - L - R, ph = H - T - B;
+  const X = (gp) => L + ((gp - gmin) / (gmax - gmin)) * pw, Y = (r) => T + (1 - (r - rmin) / (rmax - rmin)) * ph;
+  g.font = `12px ${MONO}`; g.textAlign = "right"; g.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const r = rmin + ((rmax - rmin) * i) / 4, y = Y(r);
+    g.strokeStyle = "#1c2a41"; g.beginPath(); g.moveTo(L, y); g.lineTo(L + pw, y); g.stroke();
+    g.fillStyle = "#61738f"; g.fillText(Math.round(r), L - 8, y + 4);
+  }
+  g.textAlign = "center"; g.fillStyle = "#61738f";
+  const step = Math.max(1, Math.ceil((gmax - gmin) / 8));
+  for (let gp = Math.ceil(gmin / step) * step; gp <= gmax; gp += step) g.fillText("GP " + gp, X(gp), H - 8);
+  const labels = [];
+  for (const s of sel) {
+    const m = M(s.pid), pts = hist(s.pid).filter(([gp]) => gp >= gmin);
+    if (!pts.length) continue;
+    g.strokeStyle = m.color; g.lineWidth = m.legend ? 3 : 2; g.lineJoin = "round";
+    if (m.legend) g.setLineDash([7, 5]);
+    g.beginPath(); pts.forEach(([gp, r], i) => (i ? g.lineTo(X(gp), Y(r)) : g.moveTo(X(gp), Y(r)))); g.stroke(); g.setLineDash([]);
+    const [lg, lr] = pts[pts.length - 1];
+    g.fillStyle = m.color; g.beginPath(); g.arc(X(lg), Y(lr), 4, 0, 7); g.fill();
+    labels.push({ y: Y(lr), name: (m.legend ? "★ " : "") + surname(m.name), color: m.color });
+  }
+  labels.sort((a, b) => a.y - b.y);
+  for (let i = 1; i < labels.length; i++) labels[i].y = Math.max(labels[i].y, labels[i - 1].y + 16);
+  g.textAlign = "left";
+  for (const l of labels) { g.fillStyle = l.color; g.font = `600 13px ${FONT}`; g.fillText(l.name, L + pw + 12, l.y + 4); }
+}
+const chartFromState = () => G.state && renderChart({ standings: G.state.standings, history: G.state.history, maxGp: G.state.gp });
+
+/* ============================================================ ticker & header */
+let lastMarq = "";
+function renderTicker() {
+  const st = G.state, lv = G.live;
+  if (lv) {
+    if (lv.status !== "running" && lv.status !== "pausing") {
+      $("#train-status").innerHTML = `<span class="lbl">Broadcast</span><span>${lv.status === "stopped" ? "PAUSED" : lv.status.toUpperCase()}</span>`;
+    } else if (lv.phase === "training") {
+      const bars = Array.from({ length: lv.total }, (_, i) => `<i class="${i < lv.done ? "on" : ""}"></i>`).join("");
+      $("#train-status").innerHTML = `<span class="lbl">Training block</span><span>GP ${lv.gp}</span><span class="bar">${bars}</span><span>${lv.done}/${lv.total}</span>`;
+    } else {
+      $("#train-status").innerHTML = `<span class="lbl">Next</span><span>GP ${lv.gp}</span><span class="lbl">on the grid</span>`;
+    }
+    $("#totals").innerHTML = `<span><b>${lv.episodes.toLocaleString("en-US")}</b> episodes trained</span><span><b>${lv.eps_per_s}</b> eps/s</span>`;
+  }
+  if (st) {
+    const ev = st.events.filter((e) => e.gp <= G.shownGp).slice(-12);
+    const text = ev.length ? ev.map((e) => `<b>GP ${e.gp}</b> ${esc(e.text)}`).join("&nbsp;&nbsp;&nbsp;◆&nbsp;&nbsp;&nbsp;") : "Season is about to begin…";
+    if (text !== lastMarq) {
+      lastMarq = text;
+      const inner = $("#marq-inner");
+      inner.innerHTML = text + "&nbsp;&nbsp;&nbsp;◆&nbsp;&nbsp;&nbsp;" + text + "&nbsp;&nbsp;&nbsp;◆&nbsp;&nbsp;&nbsp;";
+      inner.style.animation = "none"; void inner.offsetWidth;
+      inner.style.animation = `marq ${Math.max(40, text.length * 0.22)}s linear infinite`;
+    }
+    $("#league-name").textContent = st.league;
+  }
+  const rec = G.records.nominal, goal = st && st.goal;
+  const parts = [];
+  if (rec) parts.push(`Dry-strip record <b>${rec.time.toFixed(2)} s</b> &middot; ${esc(rec.name)}`);
+  if (goal && goal.champion_total) parts.push(`Champion <b>${goal.champion_total.toFixed(2)} s</b> / 5 scenarios`);
+  $("#record-info").innerHTML = parts.join(" &nbsp;&middot;&nbsp; ");
+}
+function chipsHtml(c) {
+  const out = [];
+  out.push(`<span class="chip-pill ${c.engine < 100 ? "warn" : ""}">ENGINE ${c.engine}%</span>`);
+  out.push(`<span class="chip-pill ${c.grip < 100 ? "cold" : ""}">GRIP ${c.grip}%</span>`);
+  if (c.patchy) out.push(`<span class="chip-pill warn">PATCHY SURFACE</span>`);
+  if (c.engine === 100 && c.grip === 100 && !c.patchy) out.push(`<span class="chip-pill">DRY &middot; PERFECT CONDITIONS</span>`);
+  return out.join("");
+}
+function setHeader(race, live) {
+  $("#gp-title").textContent = `GP ${race.gp} · ${race.title}`;
+  $("#gp-chips").innerHTML = chipsHtml(race.conditions);
+  const tag = $("#mode-tag");
+  tag.className = live ? "" : "replay";
+  $("#mode-text").textContent = live ? "LIVE" : `REPLAY · GP ${race.gp}`;
+  const n = race.season_len || (G.state && G.state.season_len) || 0;
+  $("#season-info").textContent = `Season ${race.season} · round ${race.season_gp}${n ? " / " + n : ""}`;
+}
+
+/* ============================================================ timing panel */
+function timingRows(rows, firstGold) {
+  const area = 304 - 44 - 8, n = Math.max(rows.length, 1), rh = Math.min(22, Math.floor(area / n));
+  $("#timing-rows").innerHTML = rows.map((r, i) =>
+    `<div class="tr ${i === 0 && firstGold ? "first" : ""}" style="height:${rh}px;transform:translateY(${i * rh}px)">
+       <div class="p">${r.p}</div><div class="c" style="background:${r.color}">${r.num}</div><div class="n">${esc(r.name)}</div>
+       <div class="a ${r.aCls || ""}">${r.a}</div><div class="b">${r.b}</div><div class="d ${r.dCls || ""}">${r.d}</div></div>`).join("");
+}
+
+/* ============================================================ race canvas */
+let R = null;       // the race currently on screen
+const CW = 1316, CH = 560, TAGW = 218, X0 = 252, XEND = CW - 96;
+const trackCv = $("#track"), tg = setupCanvas(trackCv, CW, CH);
+
+function prepareRace(race) {
+  const dt = race.dt, n = race.entries.length;
+  const top0 = 64, area = CH - top0 - 14, laneH = Math.min(54, area / n), y0 = top0 + (area - laneH * n) / 2;
+  const entries = race.entries.map((e) => {
+    const tr = e.trace, m = race.pilots[e.pid] || M(e.pid), kEnd = tr.k[tr.k.length - 1];
+    return { ...e, m, cur: 0, tEnd: kEnd * dt, cy: y0 + (e.lane - 0.5) * laneH };
+  });
+  const cls = new Map(race.classification.map((c) => [c.pid, c]));
+  const fin = race.classification.filter((c) => c.status === "finished");
+  const winner = fin.length ? fin[0] : null;
+  const tGreen = race.k_green * dt;
+  const tWin = winner ? entries.find((e) => e.pid === winner.pid).tEnd : null;
+  const tEnd = Math.min(Math.max(...entries.map((e) => e.tEnd)), tGreen + 32);
+  R = { race, dt, n, laneH, y0, entries, cls, winner, tGreen, tWin, tEnd, ffStart: (tWin ?? tGreen + 12) + 2.5,
+        L: race.track_length, simT: 0, bg: null, bannerShown: false };
+  R.bg = buildBg();
+  const g = tg; g.font = `600 ${laneH > 36 ? 15 : 13}px ${FONT}`;
+  for (const e of entries) {                                   // lane-tag labels, fitted once
+    let name = (e.m.legend ? "★ " : "") + e.m.name;
+    while (g.measureText(name).width > TAGW - 66 && name.length > 4) name = name.slice(0, -2);
+    e.tagName = name;
+  }
+}
+
+function buildBg() {
+  const { n, laneH, y0 } = R;
+  const c = document.createElement("canvas"); const g = setupCanvas(c, CW, CH);
+  g.fillStyle = "#0e1522"; g.fillRect(0, 0, CW, CH);
+  const bottom = y0 + n * laneH;
+  for (let i = 0; i < n; i++) { g.fillStyle = i % 2 ? "#17202f" : "#131b29"; g.fillRect(TAGW, y0 + i * laneH, CW - TAGW, laneH); }
+  for (let i = 0; i < n; i++) {                                   // curbs along both edges of every lane
+    const yt = y0 + i * laneH, yb = yt + laneH - 3;
+    for (let x = X0 - 40, k = 0; x < XEND + 40; x += 14, k++) {
+      g.fillStyle = k % 2 ? "rgba(214,222,236,.34)" : "rgba(214,69,90,.5)";
+      g.fillRect(x, yt, 14, 2); g.fillRect(x, yb + 1, 14, 2);
+    }
+  }
+  g.font = `12px ${MONO}`; g.textAlign = "center";
+  for (const m of [50, 100, 150]) {
+    const x = X0 + (m / R.L) * (XEND - X0);
+    g.strokeStyle = "rgba(255,255,255,.07)"; g.setLineDash([4, 6]); g.beginPath(); g.moveTo(x, y0); g.lineTo(x, bottom); g.stroke(); g.setLineDash([]);
+    g.fillStyle = "#61738f"; g.fillText(m + " m", x, y0 - 8);
+  }
+  g.fillStyle = "#f4f7fb"; g.fillRect(X0 - 2, y0, 3, n * laneH);
+  const sq = 6;
+  for (let yy = y0, r = 0; yy < bottom; yy += sq, r++) for (let k = 0; k < 2; k++) {
+    g.fillStyle = (r + k) % 2 ? "#0b0f17" : "#f4f7fb"; g.fillRect(XEND + k * sq, yy, sq, Math.min(sq, bottom - yy));
+  }
+  g.fillStyle = "#8497b5"; g.font = `11px ${FONT}`; g.textAlign = "left"; g.fillText("START", X0 - 8, y0 - 14);
+  g.textAlign = "right"; g.fillText("FINISH", XEND + 14, y0 - 14);
+  return c;
+}
+
+function sample(e, k) {
+  const t = e.trace, n = t.k.length;
+  if (k <= t.k[0]) return { x: 0, y: 0, v: 0, g: 1, s: 0 };
+  if (k >= t.k[n - 1]) return { x: t.x[n - 1], y: t.y[n - 1], v: t.v[n - 1], g: t.g[n - 1], s: t.s[n - 1] };
+  let i = e.cur;
+  while (i + 1 < n && t.k[i + 1] <= k) i++;
+  while (i > 0 && t.k[i] > k) i--;
+  e.cur = i;
+  const f = (k - t.k[i]) / (t.k[i + 1] - t.k[i]);
+  return { x: lerp(t.x[i], t.x[i + 1], f), y: lerp(t.y[i], t.y[i + 1], f), v: lerp(t.v[i], t.v[i + 1], f), g: t.g[i], s: lerp(t.s[i], t.s[i + 1], f) };
+}
+
+function drawCar(g, x, cy, w, color, num, angle, alpha) {
+  const L = 34;
+  g.save(); g.translate(x, cy); if (angle) g.rotate(angle); g.globalAlpha = alpha;
+  g.fillStyle = "rgba(0,0,0,.35)"; rr(g, -L + 2, -w / 2 + 3, L, w, 5); g.fill();
+  g.fillStyle = color; rr(g, -L, -w / 2, L, w, 5); g.fill();
+  g.fillStyle = "rgba(10,14,22,.55)"; rr(g, -L * 0.7, -w / 2 + 2.5, L * 0.42, w - 5, 3); g.fill();
+  g.fillStyle = "#fff6c4"; g.fillRect(-3, -w / 2 + 1.5, 3, 3); g.fillRect(-3, w / 2 - 4.5, 3, 3);
+  g.fillStyle = "#fff"; g.font = `800 ${w >= 16 ? 10 : 9}px ${MONO}`; g.textAlign = "center"; g.fillText(num, -L * 0.49, 3.4);
+  g.restore();
+}
+
+// anim = { p } during the round intro (p: 0..1 of the intro): lane tags slide in, then the cars roll onto the grid
+function drawFrame(simT, anim) {
+  const { n, laneH, entries, dt, tGreen, L } = R, k = simT / dt, g = tg;
+  g.drawImage(R.bg, 0, 0, CW, CH);
+  // lane tags
+  for (const e of entries) {
+    const tp = anim ? ease((anim.p - 0.02 - (e.lane - 1) * 0.012) / 0.2) : 1, off = -(1 - tp) * (TAGW + 30);
+    const y = e.cy - laneH / 2, m = e.m;
+    g.save(); g.translate(off, 0);
+    g.fillStyle = "#101826"; g.fillRect(0, y, TAGW, laneH);
+    g.fillStyle = m.color; rr(g, 10, e.cy - 11, 40, 22, 6); g.fill();
+    g.fillStyle = "#0b0f17"; g.font = `800 15px ${MONO}`; g.textAlign = "center"; g.fillText(m.number, 30, e.cy + 5);
+    g.textAlign = "left"; g.fillStyle = m.legend ? "#ffd700" : "#e8eef9"; g.font = `600 ${laneH > 36 ? 15 : 13}px ${FONT}`;
+    g.fillText(e.tagName, 60, e.cy + 5);
+    g.restore();
+  }
+  const w = Math.max(11, Math.min(20, laneH * 0.46)), maxOff = laneH / 2 - w / 2 - 2;
+  const px = (x) => X0 + (Math.min(x, L) / L) * (XEND - X0);
+  for (const e of entries) {
+    const s = sample(e, k), done = simT >= e.tEnd, st = e.result.status;
+    const roll = anim ? (1 - ease((anim.p - 0.15 - (e.lane - 1) * 0.02) / 0.35)) * (X0 + 60) : 0;
+    const cx = px(s.x) - roll, cy = e.cy + (s.y / 1.2) * maxOff;
+    if (anim && roll > X0 + 55) continue;
+    if (s.s > 0.12 && !done) {                                           // wheelspin smoke
+      for (let i = 0; i < 4; i++) { g.fillStyle = `rgba(220,226,238,${0.34 * s.s * (1 - i / 4)})`; g.beginPath(); g.arc(cx - 34 - i * 7, cy + ((i * 37) % 5) - 2, 3 + i * 1.7, 0, 7); g.fill(); }
+    }
+    const crashed = done && st === "crash", dnf = done && st === "timeout";
+    drawCar(g, cx, cy, w, e.m.color, e.m.number, crashed ? (e.lane % 2 ? 0.55 : -0.55) : 0, dnf ? 0.45 : crashed ? 0.8 : 1);
+    g.textAlign = "center"; g.font = `600 11px ${FONT}`; g.lineWidth = 3; g.strokeStyle = "rgba(8,12,20,.9)";
+    const label = surname(e.m.name); g.strokeText(label, cx - 17, cy - w / 2 - 4); g.fillStyle = e.m.legend ? "#ffd700" : "#e8eef9"; g.fillText(label, cx - 17, cy - w / 2 - 4);
+    if (crashed) {
+      g.strokeStyle = "#ff4d4d"; g.lineWidth = 3; g.beginPath(); g.moveTo(cx - 28, cy - 8); g.lineTo(cx - 12, cy + 8); g.moveTo(cx - 12, cy - 8); g.lineTo(cx - 28, cy + 8); g.stroke();
+    }
+    if (done) {                                                           // result tag past the finish line
+      const c = R.cls.get(e.pid); g.textAlign = "left"; g.font = `700 13px ${MONO}`;
+      if (st === "finished") { g.fillStyle = c.pos === 1 ? "#ffd700" : "#e8eef9"; g.fillText(`P${c.pos} ${fmtT(c.time)}`, XEND + 16, e.cy + 5); }
+      else { g.fillStyle = st === "crash" ? "#ff6b6b" : "#8497b5"; g.fillText(st === "crash" ? "CRASH" : "DNF", XEND + 16, e.cy + 5); }
+    }
+  }
+  // staging lights
+  const green = simT >= tGreen, lx = X0 + 24, ly = 30;
+  g.textAlign = "left"; g.font = `700 12px ${FONT}`; g.fillStyle = "#8497b5"; g.fillText(green ? "GO" : "STAGED", lx - 2, ly - 16);
+  for (let i = 0; i < 4; i++) {
+    const isGreen = i === 3, on = isGreen ? green : (!green && !anim);
+    g.fillStyle = on ? (isGreen ? "#35e07a" : "#ffb020") : "#1d2739"; g.beginPath(); g.arc(lx + 8 + i * 28, ly + 2, 9, 0, 7); g.fill();
+    if (on) { g.shadowColor = isGreen ? "#35e07a" : "#ffb020"; g.shadowBlur = 14; g.fill(); g.shadowBlur = 0; }
+  }
+  // race clock
+  const clock = Math.max(0, simT - tGreen), won = R.tWin !== null && clock >= R.tWin - tGreen, shown = won ? R.tWin - tGreen : clock;
+  g.textAlign = "right"; g.font = `800 40px ${MONO}`; g.fillStyle = won ? "#ffd700" : "#f2f6fc";
+  g.fillText(shown.toFixed(2), CW - 56, 42); g.font = `600 16px ${FONT}`; g.fillStyle = "#8497b5"; g.fillText("s", CW - 30, 42);
+  if (R.ffStart <= simT && simT < R.tEnd && R.ff > 1) { g.font = `700 13px ${FONT}`; g.fillStyle = "#8497b5"; g.fillText(`▶▶ ${R.ff}x`, CW - 190, 40); }
+  if (!R.bannerShown && R.tWin !== null && simT >= R.tWin) { R.bannerShown = true; showBanner(); }
+}
+
+let timingAt = 0;
+function updateTiming(simT, force) {
+  const now = performance.now(); if (!force && now - timingAt < 120) return; timingAt = now;
+  const { entries, dt } = R, k = simT / dt;
+  const rows = entries.map((e) => ({ e, s: sample(e, k), done: simT >= e.tEnd })).map((r) => ({ ...r, fin: r.done && r.e.result.status === "finished" }));
+  rows.sort((a, b) => (a.fin !== b.fin ? (a.fin ? -1 : 1) : a.fin ? a.e.tEnd - b.e.tEnd : b.s.x - a.s.x));
+  const lead = rows[0].s.x;
+  timingRows(rows.map((r, i) => {
+    const st = r.e.result.status, base = { p: i + 1, name: r.e.m.name, color: r.e.m.color, num: r.e.m.number };
+    if (r.fin) return { ...base, a: fmtT(R.cls.get(r.e.pid).time), b: "", d: "" };
+    if (r.done) return { ...base, a: st === "crash" ? "CRASH" : "DNF", aCls: st === "crash" ? "bad" : "slow", b: "", d: "" };
+    const gap = lead - r.s.x;
+    return { ...base, a: `${Math.round(r.s.v * 3.6)} km/h`, b: `G${r.s.g}`, d: i === 0 || gap < 1 ? "" : `-${gap.toFixed(0)} m` };
+  }), true);
+}
+function showGrid(race) {
+  const before = new Map(race.before.map((s) => [s.pid, s]));
+  timingRows(R.entries.map((e) => ({ p: e.lane, name: e.m.name, color: e.m.color, num: e.m.number,
+    a: `ELO ${Math.round((race.ratings_before || {})[e.pid] ?? (before.get(e.pid) || {}).rating ?? 1500)}`, b: "", d: "" })), false);
+}
+function showResults() {
+  const race = R.race;
+  timingRows(race.classification.map((c) => {
+    const m = race.pilots[c.pid] || M(c.pid), fin = c.status === "finished", d = c.rating_delta;
+    return { p: c.pos, name: m.name, color: m.color, num: m.number,
+      a: fin ? fmtT(c.time) : c.status === "crash" ? "CRASH" : "DNF", aCls: fin ? "" : c.status === "crash" ? "bad" : "slow",
+      b: fin && c.gap ? `+${c.gap.toFixed(2)}` : "", d: `${d >= 0 ? "+" : "−"}${Math.abs(d).toFixed(1)}`, dCls: d >= 0 ? "up" : "down" };
+  }), true);
+}
+
+/* ============================================================ overlays: banner, flag wipe, podium, confetti, intermission */
+let bannerTimer = 0;
+function showBanner() {
+  const w = R.winner; if (!w) return;
+  const m = R.race.pilots[w.pid] || M(w.pid);
+  $("#banner-v").innerHTML = `#${m.number} ${esc(m.name)}<span>${fmtT(w.time)} s</span>`;
+  $("#banner").classList.add("show"); clearTimeout(bannerTimer); bannerTimer = setTimeout(() => $("#banner").classList.remove("show"), 6000);
+}
+const hideBanner = () => { clearTimeout(bannerTimer); $("#banner").classList.remove("show"); };
+
+function restart(el, cls) { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
+
+function showPodium(race, live) {
+  const fin = race.classification.filter((c) => c.status === "finished").slice(0, 3);
+  $("#podium-k").textContent = `Grand Prix ${race.gp}  ·  ${race.title}`;
+  if (!fin.length) {
+    $("#podium-body").innerHTML = `<div class="none">NO FINISHERS</div>`;
+  } else {
+    const pod = (c, cls) => {
+      if (!c) return `<div class="pod ${cls}" style="visibility:hidden"></div>`;
+      const m = race.pilots[c.pid] || M(c.pid);
+      return `<div class="pod ${cls}" style="--c:${m.color}"><div class="who"><span class="num">#${m.number}</span>
+        <div class="nm">${m.legend ? "★ " : ""}${esc(m.name)}</div><div class="tm">${fmtT(c.time)} s</div></div>
+        <div class="blk">${c.pos}</div></div>`;
+    };
+    $("#podium-body").innerHTML = `<div class="pods">${pod(fin[1], "p2")}${pod(fin[0], "p1")}${pod(fin[2], "p3")}</div>`;
+  }
+  const el = $("#podium"); el.classList.remove("show"); void el.offsetWidth; el.classList.add("show");
+  if (fin.length && bc().animations) setTimeout(() => confetti((race.pilots[fin[0].pid] || M(fin[0].pid)).color), 1100);
+}
+const hidePodium = () => $("#podium").classList.remove("show");
+
+let confettiRun = 0;
+function confetti(color) {
+  const cv = $("#confetti"), g = setupCanvas(cv, CW, CH), id = ++confettiRun;
+  const cols = ["#ffd700", "#ffffff", color, "#ffb020", "#4f7cff"];
+  const parts = Array.from({ length: 150 }, () => {
+    const a = -Math.PI / 2 + (Math.random() - 0.5) * 1.7, sp = 7 + Math.random() * 10;
+    return { x: CW / 2 + (Math.random() - 0.5) * 160, y: CH * 0.62, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, w: 6 + Math.random() * 6, h: 3 + Math.random() * 4,
+             r: Math.random() * 6, vr: (Math.random() - 0.5) * 0.4, c: cols[(Math.random() * cols.length) | 0] };
+  });
+  let last = performance.now(), t0 = last;
+  const step = (now) => {
+    if (id !== confettiRun) return g.clearRect(0, 0, CW, CH);
+    const dt = Math.min(0.05, (now - last) / 1000) * 60; last = now;
+    g.clearRect(0, 0, CW, CH);
+    let alive = 0;
+    for (const p of parts) {
+      p.vy += 0.28 * dt; p.vx *= 0.995; p.x += p.vx * dt; p.y += p.vy * dt; p.r += p.vr * dt;
+      if (p.y < CH + 20) alive++;
+      g.save(); g.translate(p.x, p.y); g.rotate(p.r); g.fillStyle = p.c; g.globalAlpha = clamp(1 - (now - t0) / 6000 + 0.2); g.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); g.restore();
+    }
+    if (alive && now - t0 < 6500) requestAnimationFrame(step); else g.clearRect(0, 0, CW, CH);
+  };
+  requestAnimationFrame(step);
+}
+const stopConfetti = () => { confettiRun++; setupCanvas($("#confetti"), CW, CH); };
+
+// the countdown / "waiting for training" screen shown between rounds
+function updateBetween(mode, v) {
+  const lv = G.live || {};
+  const nextGp = (R ? R.race.gp : G.lastGp) + 1;
+  const bn = $("#bt-n"), bar = $("#bt-bar");
+  $("#bt-train").innerHTML = "";
+  if (mode !== "count" && lv.status !== "running" && lv.status !== "pausing") {   // paused only matters once nothing is left to play
+    $("#bt-k").textContent = "Broadcast paused"; bn.textContent = "❚❚"; bn.className = "bn small";
+    $("#bt-s").textContent = "waiting for the admin to resume"; bar.style.width = "0";
+  } else if (mode === "count") {
+    $("#bt-k").textContent = "Next round in"; bn.textContent = Math.max(1, Math.ceil(v.left)); bn.className = "bn";
+    $("#bt-s").textContent = `Grand Prix ${nextGp}`; bar.style.width = (100 * (1 - v.left / v.total)) + "%";
+  } else {
+    const done = new Set(lv.done_pids || []), st = G.state;
+    $("#bt-k").textContent = lv.phase === "training" ? "Pilots are training" : "Preparing the grid";
+    bn.textContent = lv.phase === "training" ? `${lv.done || 0} / ${lv.total || 0}` : "…"; bn.className = "bn small";
+    $("#bt-s").textContent = `Grand Prix ${nextGp}`; bar.style.width = lv.total ? (100 * (lv.done || 0) / lv.total) + "%" : "0";
+    if (st && lv.phase === "training") {
+      $("#bt-train").innerHTML = st.standings.filter((s) => !M(s.pid).legend).map((s) => {
+        const m = M(s.pid); return `<span class="tp ${done.has(s.pid) ? "done" : ""}" style="--c:${m.color}">#${m.number} ${esc(surname(m.name))}</span>`;
+      }).join("");
+    }
+  }
+}
+async function showCrown(ev) {
+  $("#crown-n").textContent = ev.name; $("#crown-t").textContent = `${ev.total.toFixed(2)} s`;
+  $("#crown-s").textContent = "total over all five scenarios \u00b7 zero crashes";
+  $("#crown").classList.add("show");
+  if (bc().animations) { confetti("#ffd700"); setTimeout(() => confetti("#ffffff"), 900); }
+  await sleep(6500);
+  $("#crown").classList.remove("show"); stopConfetti();
+}
+async function intermission(B, live) {
+  const betw = $("#between"); betw.classList.add("show");
+  const t0 = performance.now(), total = B.intermission_s;
+  for (;;) {
+    const left = total - (performance.now() - t0) / 1000, ready = G.queue.length > 0;
+    if (left <= 0 && ready) break;
+    if (!live && ready) break;                                           // a replay yields to a fresh round
+    if (left <= 0 && !ready && B.idle_replays && G.state && G.state.races.length) break;
+    updateBetween(left > 0 ? "count" : "wait", { left, total });
+    await frame();
+  }
+  betw.classList.remove("show");
+}
+
+/* ============================================================ race playback */
+function phase(ms, fn) {
+  return new Promise((res) => {
+    const t0 = performance.now();
+    const step = (now) => { const t = now - t0; if ((fn && fn(t)) || t >= ms) return res(); requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  });
+}
+function runRace(live) {
+  return new Promise((res) => {
+    let last = performance.now();
+    const step = (now) => {
+      const dtw = Math.min(0.1, (now - last) / 1000); last = now;
+      R.simT += dtw * (R.simT >= R.ffStart ? R.ff : 1);
+      drawFrame(R.simT); updateTiming(R.simT);
+      if (R.simT >= R.tEnd + 0.6 || (!live && G.queue.length)) return res();
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
+}
+
+async function playRace(race, live) {
+  const B = bc(), anim = B.animations;
+  for (const [pid, m] of Object.entries(race.pilots)) if (!G.meta[pid]) G.meta[pid] = m;
+  prepareRace(race); R.ff = B.fast_forward; setHeader(race, live);
+  stopConfetti(); hideBanner(); hidePodium();
+  G.hbGp = live ? race.gp : Math.max(G.lastGp, 0);
+  $("#timing-title").textContent = "Starting grid"; $("#timing-tag").textContent = live ? "" : "REPLAY";
+  if (live) {
+    G.rankLocked = true; G.everPlayed = true; G.shownGp = race.gp - 1;
+    renderRank(race.before);
+    renderChart({ standings: race.before, history: race.history, maxGp: race.gp - 1 });
+  } else if (G.state) { renderRank(G.state.standings); chartFromState(); G.shownGp = G.state.gp; }
+  G.records = live ? { ...(G.state ? G.state.records : {}), ...(race.records || {}) } : (G.state ? G.state.records : {});
+  renderTicker(); showGrid(race); drawFrame(0, anim ? { p: 0 } : null);
+
+  // --- round start: title card, sweep, lane tags slide in, cars roll onto the grid
+  $("#card-k").textContent = `Grand Prix ${race.gp}  ·  Season ${race.season}`;
+  $("#card-t").textContent = race.title; $("#card-chips").innerHTML = chipsHtml(race.conditions);
+  $("#card").classList.add("show"); if (anim) restart($("#sweep"), "go");
+  const introMs = B.intro_s * 1000;
+  await phase(introMs, (t) => { drawFrame(0, anim ? { p: t / introMs } : null); return !live && G.queue.length > 0; });
+  $("#card").classList.remove("show");
+  if (!live && G.queue.length) return;
+  await phase(B.staging_s * 1000, () => { drawFrame(0); });
+  $("#timing-title").textContent = "Live timing"; updateTiming(0, true);
+
+  // --- the race
+  await runRace(live);
+  if (!live && G.queue.length) { hideBanner(); return; }
+  drawFrame(R.tEnd); await phase(1000);
+
+  // --- round end: chequered-flag wipe, results, podium + confetti
+  if (anim) { restart($("#wipe"), "go"); await sleep(520); }
+  $("#timing-title").textContent = live ? "Classification" : `Classification · GP ${race.gp}`;
+  showResults();
+  if (!R.winner) { $("#banner-v").textContent = "NO FINISHERS"; $("#banner").classList.add("show"); }
+  if (live) {
+    renderRank(race.after); G.shownGp = race.gp; G.records = race.records || G.records;
+    renderChart({ standings: race.after, history: race.history, maxGp: race.gp }); renderTicker();
+  }
+  hideBanner(); showPodium(race, live);
+  await phase(B.podium_s * 1000, () => !live && G.queue.length > 0);
+  hidePodium(); stopConfetti();
+  const crownEv = live && (race.events || []).find((e) => e.kind === "champion");
+  if (crownEv) await showCrown(crownEv);
+  G.rankLocked = false;
+
+  // --- pause between rounds (countdown, or the training screen if the next round isn't ready yet)
+  await intermission(B, live);
+}
+
+async function getRace(id) {
+  if (G.races.has(id)) return G.races.get(id);
+  const race = await jget(`/data/races/${id}.json`);
+  G.races.set(id, race);
+  if (G.races.size > 12) G.races.delete(G.races.keys().next().value);
+  return race;
+}
+function pickReplay() {
+  const ids = (G.state ? G.state.races : []).map((r) => r.id);
+  if (!ids.length) return null;
+  const recent = ids.slice(-12);
+  if (G.lastReplay === null) return (G.lastReplay = recent[recent.length - 1]);
+  const options = recent.filter((id) => id !== G.lastReplay);
+  return (G.lastReplay = options.length ? options[Math.floor(Math.random() * options.length)] : recent[0]);
+}
+async function director() {
+  for (;;) {
+    let id = null, live = false;
+    const B = bc();
+    if (G.queue.length) {
+      while (G.queue.length > B.lead_rounds + 3) G.queue.shift();         // safety net only; the trainer normally never runs that far ahead
+      id = G.queue.shift(); live = true;
+    } else if (G.state && G.state.races.length && (G.initialReplay || B.idle_replays)) {
+      G.initialReplay = false; id = pickReplay();
+    } else {
+      // nothing to show yet: the "waiting" screen over the track
+      if (!R) { $("#wait").style.display = "flex"; }
+      else { $("#between").classList.add("show"); updateBetween("wait"); }
+      await sleep(250); continue;
+    }
+    $("#wait").style.display = "none"; $("#between").classList.remove("show");
+    try { await playRace(await getRace(id), live); }
+    catch (err) { console.error(err); G.rankLocked = false; await sleep(2500); }
+  }
+}
+
+/* ============================================================ polling */
+function onState(st) {
+  const first = !G.state;
+  if (G.state && st.gp < G.lastGp) {                                       // league was reset
+    G.queue.length = 0; G.races.clear(); G.lastReplay = null; G.lastGp = st.gp; G.everPlayed = false; G.initialReplay = false; G.shownGp = st.gp; G.hbGp = st.gp;
+  }
+  G.state = st; Object.assign(G.meta, st.pilots);
+  if (first) { G.lastGp = st.races.length ? st.races[st.races.length - 1].gp : 0; G.shownGp = st.gp; G.hbGp = st.gp; G.records = st.records; }
+  else for (const r of st.races) if (r.gp > G.lastGp) { G.queue.push(r.id); G.lastGp = r.gp; }
+  if (!G.everPlayed && !G.rankLocked) { renderRank(st.standings); chartFromState(); G.records = st.records; }
+  renderTicker();
+  if (!st.races.length) {
+    $("#gp-title").textContent = "Waiting for the first Grand Prix";
+    const lv = G.live;
+    $("#wait-main").textContent = lv && lv.status === "running" ? "Waiting for the first Grand Prix" : "Broadcast not started";
+    $("#wait-sub").textContent = lv && lv.status === "running" ? (lv.phase === "training" ? `pilots are training: ${lv.done}/${lv.total}` : "pilots are warming up their brains…") : "start the league from the admin panel";
+  }
+}
+async function poll() {
+  try {
+    const [st, lv] = await Promise.all([jget("/data/state.json"), jget("/data/live.json").catch(() => null)]);
+    G.live = lv; onState(st);
+  } catch (err) { $("#gp-title").textContent = "Waiting for the league…"; }
+  setTimeout(poll, 1500);
+}
+// tell the league which round is on screen, so training stays a couple of rounds ahead and no further
+function heartbeat() {
+  fetch("/api/viewer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ gp: G.hbGp }) }).catch(() => {});
+}
+poll(); director(); setInterval(heartbeat, 3000);
+</script>
+</body>
+</html>
