@@ -115,6 +115,9 @@ SETTINGS_SPEC = [
          apply="round", help="At the end of a season the lowest-rated veteran may retire."),
     dict(key="retire_count", group="Season", label="Retirements per season", type="int", min=0, max=5, default=1,
          apply="round", help="0 disables retirements and rookies."),
+    dict(key="season_carry", group="Season", label="Rating carried into next season", type="float", min=0, max=1, step=0.05,
+         default=0.5, apply="round",
+         help="At the end of a season every rating is pulled back toward 1500: 1 = keep everything, 0 = full reset, 0.5 = halfway."),
     dict(key="min_age", group="Season", label="Veteran after (rounds)", type="int", min=1, max=1000, default=12,
          apply="round", help="A pilot must have raced this many rounds before it can retire."),
 
@@ -487,7 +490,8 @@ class League:
         return [p for p in list(self.pilots.values()) if not p["legend"]]
 
     def meta(self, p: dict) -> dict:
-        return {k: p[k] for k in ("name", "nation", "number", "color", "legend", "joined_gp")}
+        return {**{k: p[k] for k in ("name", "nation", "number", "color", "legend", "joined_gp")},
+                "titles": p.get("titles", 0), "peak": round(p.get("peak", p["rating"]), 1)}
 
     def apply_field_settings(self):
         """Bring the roster in line with the current settings (round boundary only)."""
@@ -882,8 +886,10 @@ class League:
                 score = 0.5 if ranks[i] == ranks[j] else (1.0 if i < j else 0.0)
                 deltas[a] += k / (n - 1) * (score - expected)
         for pid, d in deltas.items():
-            self.pilots[pid]["rating"] += d
-            self.pilots[pid]["last_delta"] = d
+            p = self.pilots[pid]
+            p["rating"] += d
+            p["last_delta"] = d
+            p["peak"] = max(p.get("peak", p["rating"]), p["rating"])
         return deltas
 
     def update_stats_and_events(self, order, raced, scenario, winner_time) -> list[dict]:
@@ -922,9 +928,43 @@ class League:
             p["form"] = p["form"][-10:]
         return events
 
+    def crown_season(self, events: list) -> None:
+        """The season's champion is the best-rated trained fly; the title stays with the fly for good."""
+        table = sorted(self.trained(), key=lambda p: -p["rating"])
+        if not table:
+            return
+        champ = table[0]
+        champ["titles"] = champ.get("titles", 0) + 1
+        top = [{"pid": p["id"], "name": p["name"], "rating": round(p["rating"], 1)} for p in table[:3]]
+        events.append({"kind": "season_champion", "pid": champ["id"], "name": champ["name"], "season": self.season,
+                       "rating": round(champ["rating"], 1), "titles": champ["titles"], "top": top,
+                       "text": f"SEASON {self.season} CHAMPION: {champ['name']} ({champ['rating']:.0f} Elo)"})
+        path = CANDIDATES.parent / "seasons.json"
+        try:
+            log = json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
+        except Exception:
+            log = []
+        log.append({"season": self.season, "gp": self.gp, "ts": time.time(), "champion": top[0], "podium": top,
+                    "peak": round(champ.get("peak", champ["rating"]), 1)})
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            atomic_write_json(path, log)
+        except Exception:
+            pass
+
+    def soft_reset_ratings(self, events: list) -> None:
+        keep = self.cfg["season_carry"]
+        if keep >= 1:
+            return
+        for p in self.pilots.values():
+            p["rating"] = START_RATING + (p["rating"] - START_RATING) * keep
+        events.append({"kind": "season_reset", "text": "New season: ratings pulled "
+                       + ("back to 1500" if keep <= 0 else f"{round((1 - keep) * 100)}% of the way back to 1500")})
+
     def season_end(self) -> list[dict]:
         events = [{"kind": "season", "text": f"Season {self.season} complete"}]
         gp = self.gp
+        self.crown_season(events)
         for _ in range(self.cfg["retire_count"]):
             eligible = [p for p in self.trained() if gp - p["joined_gp"] + 1 >= self.cfg["min_age"]]
             if not eligible or len(self.trained()) < 2:
@@ -939,6 +979,7 @@ class League:
             rookie = self.add_rookie(worst["rating"])
             events.append({"kind": "rookie", "pid": rookie["id"],
                            "text": f"Rookie {rookie['name']} ({rookie['nation']}) joins as #{rookie['number']}"})
+        self.soft_reset_ratings(events)
         return events
 
     def prune_races(self):

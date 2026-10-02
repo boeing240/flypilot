@@ -228,7 +228,7 @@
     <div id="podium"><div class="pk" id="podium-k"></div><div id="podium-body"></div></div>
     <div id="between"><div class="bk" id="bt-k"></div><div class="bn" id="bt-n"></div><div class="bs" id="bt-s"></div>
       <div class="bbar"><div id="bt-bar"></div></div><div class="btrain" id="bt-train"></div></div>
-    <div id="crown"><span id="crown-face"></span><div class="ck">NEW CHAMPION</div><div class="cn" id="crown-n"></div><div class="ct" id="crown-t"></div><div class="cs" id="crown-s"></div></div>
+    <div id="crown"><span id="crown-face"></span><div class="ck" id="crown-k">NEW CHAMPION</div><div class="cn" id="crown-n"></div><div class="ct" id="crown-t"></div><div class="cs" id="crown-s"></div></div>
     <canvas id="confetti"></canvas>
   </section>
 
@@ -400,7 +400,7 @@ function renderRank(snap) {
     row.pos.textContent = s.rank;
     const fu = faceURL(m); if (row.face.dataset.u !== fu) { row.face.dataset.u = fu; row.face.src = fu; }
     row.nm.textContent = m.name;
-    row.sub.textContent = `#${m.number}  ·  ${m.nation}  ·  ${s.episodes.toLocaleString("en-US")} eps${m.legend ? "  ·  reigning champion" : ""}`;
+    row.sub.textContent = `#${m.number}  ·  ${m.nation}  ·  ${s.episodes.toLocaleString("en-US")} eps${m.legend ? "  ·  reigning champion" : ""}${m.titles ? `  ·  ${m.titles}× season champion` : ""}`;
     row.pb.textContent = s.pb ? s.pb.toFixed(2) : "–";
     const f = s.form.slice(-5);
     row.form.innerHTML = Array.from({ length: 5 - f.length }, () => "<i></i>").join("") + f.map((c) => `<i class="${c}"></i>`).join("");
@@ -788,9 +788,18 @@ function updateBetween(mode, v) {
 }
 let lastTrainHtml = "";
 async function showCrown(ev) {
-  $("#crown-face").innerHTML = faceImg({ color: (G.meta[ev.pid] || {}).color || "#ffd700", legend: true }, 260);
-  $("#crown-n").textContent = ev.name; $("#crown-t").textContent = `${ev.total.toFixed(2)} s`;
-  $("#crown-s").textContent = "total over all five scenarios \u00b7 zero crashes";
+  await showTitle(ev.pid, "NEW CHAMPION", ev.name, `${ev.total.toFixed(2)} s`, "total over all five scenarios \u00b7 zero crashes");
+}
+async function showSeasonChampion(ev) {
+  const runners = (ev.top || []).slice(1).map((t) => `${t.name} ${Math.round(t.rating)}`).join("  \u00b7  ");
+  await showTitle(ev.pid, `SEASON ${ev.season} CHAMPION`, ev.name, `${Math.round(ev.rating)} Elo`,
+    (ev.titles > 1 ? `${ev.titles}\u00d7 champion \u00b7 ` : "") + (runners ? `behind: ${runners}` : ""));
+}
+async function showTitle(pid, kicker, name, big, sub) {
+  $("#crown-face").innerHTML = faceImg({ color: (G.meta[pid] || {}).color || "#ffd700", legend: true }, 260);
+  $("#crown-k").textContent = kicker;
+  $("#crown-n").textContent = name; $("#crown-t").textContent = big;
+  $("#crown-s").textContent = sub;
   $("#crown").classList.add("show");
   if (bc().animations) { confetti("#ffd700"); setTimeout(() => confetti("#ffffff"), 900); }
   await sleep(6500);
@@ -877,6 +886,8 @@ async function playRace(race, live) {
   hidePodium(); stopConfetti();
   const crownEv = live && (race.events || []).find((e) => e.kind === "champion");
   if (crownEv) await showCrown(crownEv);
+  const seasonEv = live && (race.events || []).find((e) => e.kind === "season_champion");
+  if (seasonEv) await showSeasonChampion(seasonEv);
   G.rankLocked = false;
 
   // --- pause between rounds (countdown, or the training screen if the next round isn't ready yet)

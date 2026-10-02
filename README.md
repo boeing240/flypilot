@@ -75,6 +75,10 @@ a frozen-policy race on shared conditions; finishing order updates an Elo rating
 which is the pilot ranking. Every fly gets a stable, human-looking name, number
 and livery from its seed. At the end of each season the lowest-rated veteran
 retires and a rookie with a fresh random genome takes the seat.
+The rookie inherits the retiree's rating, so Elo points are never created. Each season
+also crowns a champion (best rating; titles are kept on the fly and logged in
+`stream_data/archive/seasons.json`), then every rating is pulled part of the way back to 1500
+(*Rating carried into next season*, default 0.5; 1 keeps everything, 0 resets fully).
 
 Rounds run back to back with no dead air: the next round trains while the page
 is still playing the current one (the page reports which round it shows, and
