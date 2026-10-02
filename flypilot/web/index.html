@@ -81,7 +81,7 @@
   #card {
     position: absolute; left: 0; right: 0; top: 150px; margin: auto; width: 760px; text-align: center; padding: 26px 30px 24px;
     background: rgba(8,12,20,.86); border: 1px solid #2b3d5c; border-radius: 16px; opacity: 0; transform: scale(.96);
-    transition: opacity .5s, transform .5s; pointer-events: none; backdrop-filter: blur(4px);
+    transition: opacity .5s, transform .5s; pointer-events: none;
   }
   #card.show { opacity: 1; transform: scale(1); }
   #card .k { font-size: 16px; letter-spacing: .3em; color: var(--muted); text-transform: uppercase; }
@@ -132,7 +132,7 @@
   .pod.p1 .blk { height: 96px; } .pod.p2 .blk { height: 68px; } .pod.p3 .blk { height: 46px; }
   #confetti { position: absolute; left: 0; top: 0; width: 1316px; height: 560px; z-index: 6; pointer-events: none; }
   #between { position: absolute; left: 0; right: 0; top: 0; bottom: 0; z-index: 4; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
-    background: rgba(8,12,20,.8); opacity: 0; pointer-events: none; transition: opacity .5s; backdrop-filter: blur(3px); }
+    background: rgba(8,12,20,.8); opacity: 0; pointer-events: none; transition: opacity .5s; }
   #between.show { opacity: 1; }
   #between .bk { font-size: 17px; letter-spacing: .34em; color: var(--muted); text-transform: uppercase; }
   #between .bn { font-family: var(--mono); font-size: 120px; font-weight: 800; line-height: 1; color: #fff; text-shadow: 0 0 40px rgba(79,124,255,.45); }
@@ -309,7 +309,11 @@ function faceCanvas(color, legend) {
 const faceURLs = new Map();
 function faceURL(m) {
   const key = m.color + (m.legend ? "*" : "");
-  if (!faceURLs.has(key)) faceURLs.set(key, faceCanvas(m.color, m.legend).toDataURL());
+  if (!faceURLs.has(key)) {                    // a short blob: URL: re-inserting a big data: URL into the DOM every frame is what made the page lag
+    const bin = atob(faceCanvas(m.color, m.legend).toDataURL().split(",")[1]), a = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i);
+    faceURLs.set(key, URL.createObjectURL(new Blob([a], { type: "image/png" })));
+  }
   return faceURLs.get(key);
 }
 const faceImg = (m, px, cls = "") => `<img class="face ${cls}" src="${faceURL(m)}" width="${px}" height="${px}" alt="">`;
@@ -749,7 +753,7 @@ function updateBetween(mode, v) {
   const lv = G.live || {};
   const nextGp = (R ? R.race.gp : G.lastGp) + 1;
   const bn = $("#bt-n"), bar = $("#bt-bar");
-  $("#bt-train").innerHTML = "";
+  let trainHtml = "";
   if (mode !== "count" && lv.status !== "running" && lv.status !== "pausing") {   // paused only matters once nothing is left to play
     $("#bt-k").textContent = "Broadcast paused"; bn.textContent = "❚❚"; bn.className = "bn small";
     $("#bt-s").textContent = "waiting for the admin to resume"; bar.style.width = "0";
@@ -762,12 +766,14 @@ function updateBetween(mode, v) {
     bn.textContent = lv.phase === "training" ? `${lv.done || 0} / ${lv.total || 0}` : "…"; bn.className = "bn small";
     $("#bt-s").textContent = `Grand Prix ${nextGp}`; bar.style.width = lv.total ? (100 * (lv.done || 0) / lv.total) + "%" : "0";
     if (st && lv.phase === "training") {
-      $("#bt-train").innerHTML = st.standings.filter((s) => !M(s.pid).legend).map((s) => {
+      trainHtml = st.standings.filter((s) => !M(s.pid).legend).map((s) => {
         const m = M(s.pid); return `<span class="tp ${done.has(s.pid) ? "done" : ""}" style="--c:${m.color}">${faceImg(m, 28)}#${m.number} ${esc(surname(m.name))}</span>`;
       }).join("");
     }
   }
+  if (trainHtml !== lastTrainHtml) { lastTrainHtml = trainHtml; $("#bt-train").innerHTML = trainHtml; }   // this runs every frame
 }
+let lastTrainHtml = "";
 async function showCrown(ev) {
   $("#crown-face").innerHTML = faceImg({ color: (G.meta[ev.pid] || {}).color || "#ffd700", legend: true }, 260);
   $("#crown-n").textContent = ev.name; $("#crown-t").textContent = `${ev.total.toFixed(2)} s`;
