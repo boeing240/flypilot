@@ -295,7 +295,7 @@ class League:
         self.records: dict = {}
         self.events: list[dict] = []
         self.races: list[dict] = []
-        self.used_names: set[str] = set()
+        self.used_names: set[str] = self.load_known_names()   # names of every pilot of every past league
         self.next_pid = 1
         self.pending_events: list[dict] = []
 
@@ -419,8 +419,23 @@ class League:
         self.history[pid] = [[self.gp, START_RATING]]
         return pilot
 
+    @staticmethod
+    def names_path():
+        return CANDIDATES.parent / "names.json"
+
+    def load_known_names(self) -> set:
+        try:
+            return set(json.loads(self.names_path().read_text(encoding="utf-8")))
+        except Exception:
+            return set()
+
     def _new_pilot(self, pid, ident, brain, seed) -> dict:
         self.used_names.add(ident["name"])
+        try:
+            self.names_path().parent.mkdir(parents=True, exist_ok=True)
+            atomic_write_json(self.names_path(), sorted(self.used_names))
+        except Exception:
+            pass
         return {
             "id": pid, **ident, "seed": seed, "brain": brain,
             "dl": ValueDopamineTracker(N_PN), "dt": DopamineTracker(),
