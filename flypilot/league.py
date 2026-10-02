@@ -878,9 +878,9 @@ class League:
                     events.append({"kind": "first_finish", "pid": pid,
                                    "text": f"{p['name']} finishes a race for the first time ({r['time']:.2f} s)"})
                 p["finishes"] += 1
+                if p["pb"] is None or r["time"] < p["pb"]:      # best finish in any conditions (hot/cold/patchy are only slower)
+                    p["pb"] = round(r["time"], 3)
                 if scenario == "nominal":
-                    if p["pb"] is None or r["time"] < p["pb"]:
-                        p["pb"] = round(r["time"], 3)
                     rec = self.records.get("nominal")
                     if rec is None:
                         self.records["nominal"] = {"pid": pid, "name": p["name"], "time": round(r["time"], 3), "gp": self.gp}
