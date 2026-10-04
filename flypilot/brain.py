@@ -132,6 +132,9 @@ class FlyBrain:
         steer = float(np.tanh(steer_pos - steer_neg))
         shift_flag = bool(shift > self.shift_threshold)
 
+        if getattr(self, "trace", False):                    # set only while a race is being recorded for the viewer
+            self.last = (float(throttle), steer, bool(shift_flag), pool_used.copy(), np.flatnonzero(kc))
+
         if explore:
             # single-tick trace only: correlating this tick's dopamine with a
             # *previous* tick's noise sample is pure variance, not signal, since

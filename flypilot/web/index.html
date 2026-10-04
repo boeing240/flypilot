@@ -183,6 +183,22 @@
   #chartp { left: 1156px; top: 676px; width: 740px; height: 304px; }
   #chart { position: absolute; left: 0; top: 40px; width: 740px; height: 264px; }
 
+  #chartp h2 { gap: 12px; }
+  #brain, #evo { position: absolute; left: 0; top: 40px; width: 740px; height: 264px; display: none; }
+  #chartp[data-view="brain"] #chart, #chartp[data-view="evo"] #chart { display: none; }
+  #chartp[data-view="brain"] #brain, #chartp[data-view="evo"] #evo { display: block; }
+  #chartp[data-view="brain"] h2 { color: #8fb8ff; }
+
+  #rank-rows { bottom: 74px !important; }
+  #rank-legend { position: absolute; left: 18px; right: 18px; bottom: 10px; height: 58px; padding-top: 8px; border-top: 1px solid #22314a; font-size: 12.5px; line-height: 1.45; color: #8497b5; }
+  #rank-legend b { color: #c9d6ec; font-weight: 600; }
+  #rank-legend .lg { font-size: 11px; } .lg.w { color: var(--gold); } .lg.f { color: var(--up); } .lg.c { color: var(--down); } .lg.t { color: #6b7a93; }
+  #qr { position: absolute; right: 22px; bottom: 18px; display: flex; align-items: center; gap: 12px; opacity: .96; }
+  #qr .tile { width: 112px; height: 112px; background: #fff; border-radius: 8px; padding: 9px; }
+  #qr svg { width: 100%; height: 100%; display: block; }
+  #qr .cap { font-size: 13px; line-height: 1.4; color: #9fb4d6; max-width: 150px; text-align: left; }
+  #qr .cap b { color: #fff; font-size: 14px; display: block; }
+
   /* ---------- ticker ---------- */
   #ticker { position: absolute; left: 24px; top: 996px; width: 1872px; height: 60px; display: flex; align-items: stretch; gap: 14px; }
   #ticker > div { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; display: flex; align-items: center; }
@@ -225,8 +241,10 @@
 
   <section id="rank" class="panel">
     <h2>Fly pilots <span class="tag">ranking &middot; ELO</span></h2>
-    <div class="head"><span style="width:34px">#</span><span style="width:52px"></span><span style="flex:1;text-align:left">Pilot</span><span style="width:62px">Form</span><span style="width:64px">Best</span><span style="width:92px">Rating</span></div>
+    <div class="head"><span style="width:34px">#</span><span style="width:52px"></span><span style="flex:1;text-align:left">Pilot</span><span style="width:62px">Last 5</span><span style="width:64px">Best, s</span><span style="width:92px">Elo</span></div>
     <div id="rank-rows"></div>
+    <div id="rank-legend"><div><span class="lg w">&#9679;</span> win <span class="lg f">&#9679;</span> finish <span class="lg c">&#9679;</span> crash <span class="lg t">&#9679;</span> timeout &mdash; the last five races</div>
+      <div><b>Best</b> = fastest finish. <b>Elo</b> = skill rating, as in chess: it rises when a fly beats stronger ones.</div></div>
   </section>
 
   <section id="trackp" class="panel">
@@ -237,6 +255,7 @@
     <div id="podium"><div class="pk" id="podium-k"></div><div id="podium-body"></div></div>
     <div id="between"><div class="bk" id="bt-k"></div><div class="bn" id="bt-n"></div><div class="bs" id="bt-s"></div>
       <div class="bbar"><div id="bt-bar"></div></div><div class="btrain" id="bt-train"></div>
+      <div id="qr"><div class="tile"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 29 29" id="qr-svg"><path class="qrline" stroke="#0b0f17" d="M0 0.5h7m2 0h1m2 0h1m2 0h1m1 0h3m2 0h7m-29 1h1m5 0h1m2 0h4m1 0h2m1 0h1m2 0h1m1 0h1m5 0h1m-29 1h1m1 0h3m1 0h1m2 0h1m1 0h1m3 0h1m1 0h1m2 0h1m1 0h1m1 0h3m1 0h1m-29 1h1m1 0h3m1 0h1m6 0h1m4 0h2m2 0h1m1 0h3m1 0h1m-29 1h1m1 0h3m1 0h1m3 0h9m3 0h1m1 0h3m1 0h1m-29 1h1m5 0h1m1 0h2m1 0h1m1 0h3m1 0h3m2 0h1m5 0h1m-29 1h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7m-20 1h1m1 0h2m2 0h1m1 0h1m1 0h2m-21 1h1m2 0h1m1 0h2m1 0h2m1 0h2m2 0h2m2 0h1m1 0h1m1 0h1m-23 1h5m2 0h2m2 0h1m3 0h2m2 0h1m1 0h1m2 0h1m2 0h1m-29 1h1m1 0h1m1 0h1m1 0h5m1 0h1m3 0h2m1 0h3m2 0h4m-28 1h2m5 0h1m6 0h2m2 0h1m1 0h1m3 0h1m1 0h2m-28 1h1m1 0h6m2 0h3m2 0h4m1 0h3m2 0h1m1 0h2m-29 1h4m1 0h1m2 0h1m3 0h1m4 0h5m-22 1h1m2 0h2m1 0h2m2 0h1m5 0h1m1 0h1m1 0h1m1 0h7m-29 1h1m3 0h2m2 0h1m2 0h1m1 0h3m1 0h1m2 0h3m2 0h1m1 0h1m-24 1h3m1 0h1m1 0h5m1 0h3m1 0h1m2 0h1m3 0h1m-26 1h1m2 0h1m1 0h4m5 0h1m1 0h1m1 0h4m1 0h1m2 0h1m-29 1h1m1 0h6m1 0h2m1 0h2m7 0h1m1 0h2m2 0h2m-27 1h1m1 0h1m2 0h1m1 0h5m1 0h3m2 0h2m1 0h2m2 0h2m-29 1h1m5 0h1m1 0h1m1 0h2m2 0h2m2 0h7m1 0h1m-19 1h1m1 0h4m2 0h5m3 0h1m1 0h3m-29 1h7m6 0h2m3 0h1m1 0h1m1 0h1m1 0h1m2 0h1m-28 1h1m5 0h1m1 0h1m1 0h1m1 0h2m1 0h2m3 0h1m3 0h3m-27 1h1m1 0h3m1 0h1m3 0h2m2 0h5m1 0h5m2 0h2m-29 1h1m1 0h3m1 0h1m1 0h1m1 0h3m1 0h1m4 0h2m1 0h6m-28 1h1m1 0h3m1 0h1m2 0h6m1 0h1m2 0h2m3 0h3m1 0h1m-29 1h1m5 0h1m2 0h1m6 0h6m2 0h1m2 0h1m-28 1h7m1 0h2m1 0h3m3 0h1m2 0h6m1 0h1"/></svg></div><div class="cap"><b>Open research</b>scan to read the code and the findings</div></div>
       <div id="sci"><div class="sk">inside a pilot&rsquo;s brain</div><canvas id="sci-cv"></canvas><div id="sci-fact"></div></div></div>
     <div id="crown"><span id="crown-face"></span><div class="ck" id="crown-k">NEW CHAMPION</div><div class="cn" id="crown-n"></div><div class="ct" id="crown-t"></div><div class="cs" id="crown-s"></div></div>
     <canvas id="confetti"></canvas>
@@ -248,8 +267,8 @@
   </section>
 
   <section id="chartp" class="panel">
-    <h2>Rating progress &middot; chasing the Legend</h2>
-    <canvas id="chart"></canvas>
+    <h2><span id="chartp-title">Rating progress &middot; chasing the Legend</span><span class="tag" id="chartp-tag"></span></h2>
+    <canvas id="chart"></canvas><canvas id="brain"></canvas><canvas id="evo"></canvas>
   </section>
 
   <div id="ticker">
@@ -369,7 +388,7 @@ function rr(g, x, y, w, h, r) {
 }
 
 /* ============================================================ ranking panel */
-const RANK_AREA = 800;
+const RANK_AREA = 726;
 function makeRow() {
   const el = document.createElement("div");
   el.className = "row";
@@ -588,6 +607,109 @@ function sciFrame(now) {
 function sciStart() { if (sci.on) return; if (!sci.g) sciInit(); sci.on = true; sci.t0 = performance.now(); sci.factAt = 0; sci.raf = requestAnimationFrame(sciFrame); }
 function sciStop() { sci.on = false; cancelAnimationFrame(sci.raf); }
 
+/* ============================================================ bottom-right panel: rating chart / the brain at work / evolution */
+const PANEL_TITLE = { chart: "Rating progress \u00b7 chasing the Legend", brain: "Inside the brain", evo: "Evolution \u00b7 do the children get faster?" };
+let panelView = "chart", panelLock = false;
+function setView(v, tag = "") {
+  panelView = v; $("#chartp").dataset.view = v;
+  $("#chartp-title").textContent = PANEL_TITLE[v]; $("#chartp-tag").textContent = tag;
+  if (v === "evo") drawEvo();
+}
+setInterval(() => { if (!panelLock) setView(panelView === "chart" ? "evo" : "chart"); }, 14000);
+
+const brainV = { g: null, a: new Float32Array(600), spot: null, spotAt: 0, at: 0, pool: [0, 0, 0, 0, 0] };
+function brainReset() { brainV.a.fill(0); brainV.spot = null; brainV.spotAt = -9; brainV.at = 0; }
+// the fly in front gets the spotlight (with a short dwell so it doesn't flicker when two cars swap places)
+function drawBrain(simT, leaderE) {
+  if (panelView !== "brain") return;
+  const now = performance.now(); if (now - brainV.at < 110) return; brainV.at = now;
+  const W = 740, H = 264, g = (brainV.g = brainV.g || setupCanvas($("#brain"), W, H));
+  if (leaderE && (!brainV.spot || (leaderE !== brainV.spot && simT - brainV.spotAt > 2.5))) { brainV.spot = leaderE; brainV.spotAt = simT; brainV.a.fill(0); }
+  const e = brainV.spot; if (!e) return;
+  const tr = e.trace; if (!tr.th || !tr.kc || !tr.kc.k.length) return;                 // races recorded before this view existed
+  const k = simT / R.dt, s = sample(e, k), done = simT >= e.tEnd, i = e.cur;
+  const th = done ? 0 : tr.th[i], st = done ? 0 : tr.st[i], sh = !done && tr.sh[i];
+  const kc = tr.kc, j = clamp(Math.floor(k / 10) - 1, 0, kc.k.length - 1);
+  const act = done ? [] : kc.i[j]; brainV.pool = done ? [0, 0, 0, 0, 0] : kc.p[j];
+  $("#chartp-title").textContent = `Inside ${e.m.name}\u2019s brain`; $("#chartp-tag").textContent = "recorded live";
+  g.clearRect(0, 0, W, H);
+  const lit = new Uint8Array(600); for (const n of act) lit[n] = 1;
+  // --- the controls the brain is producing
+  const lab = (t, x, y, c = "#8497b5") => { g.fillStyle = c; g.font = `700 11px ${FONT}`; g.textAlign = "left"; g.fillText(t, x, y); };
+  lab("THROTTLE", 16, 34); g.fillStyle = "#1b2639"; rr(g, 16, 40, 222, 14, 4); g.fill();
+  g.fillStyle = "#3ddc97"; rr(g, 16, 40, Math.max(2, 222 * th), 14, 4); g.fill();
+  g.fillStyle = "#e8eef9"; g.font = `700 13px ${MONO}`; g.textAlign = "right"; g.fillText(`${Math.round(th * 100)}%`, 238, 34);
+  lab("STEERING", 16, 84); g.fillStyle = "#1b2639"; rr(g, 16, 90, 222, 14, 4); g.fill();
+  g.fillStyle = "#4a5a78"; g.fillRect(126, 88, 2, 18);
+  g.fillStyle = Math.abs(st) > 0.5 ? "#ffb020" : "#6fa8ff"; rr(g, 127 + st * 100 - 6, 88, 12, 18, 4); g.fill();
+  g.fillStyle = "#e8eef9"; g.font = `700 13px ${MONO}`; g.textAlign = "right"; g.fillText(st < -0.05 ? "\u2190 left" : st > 0.05 ? "right \u2192" : "straight", 238, 84);
+  lab("GEAR", 16, 134);
+  g.fillStyle = "#e8eef9"; g.font = `800 34px ${MONO}`; g.textAlign = "left"; g.fillText(`${s.g}`, 16, 168);
+  g.fillStyle = sh ? "#ffb020" : "#1b2639"; rr(g, 66, 144, 86, 28, 7); g.fill();
+  g.fillStyle = sh ? "#1a1000" : "#4a5a78"; g.font = `800 14px ${FONT}`; g.textAlign = "center"; g.fillText("SHIFT", 109, 163);
+  lab("SPEED", 16, 204); g.fillStyle = "#e8eef9"; g.font = `800 30px ${MONO}`; g.textAlign = "left"; g.fillText(`${Math.round(s.v * 3.6)}`, 16, 236);
+  g.fillStyle = "#8497b5"; g.font = `600 13px ${FONT}`; g.fillText("km/h", 82, 236);
+  // --- the 600 Kenyon cells: lit = firing on this very tick of the recorded run
+  const x0 = 262, y0 = 30, dx = 8, dy = 9.4;
+  for (let n = 0; n < 600; n++) {
+    const on = lit[n]; brainV.a[n] += (on - brainV.a[n]) * 0.55;
+    const a = brainV.a[n], lat = n >= 450, cx = x0 + (n % 30) * dx + 4, cy = y0 + Math.floor(n / 30) * dy + (lat ? 6 : 0);
+    g.fillStyle = a > 0.25 ? (lat ? `rgba(61,220,151,${0.45 + 0.55 * a})` : `rgba(255,215,0,${0.45 + 0.55 * a})`) : "rgba(110,130,165,.28)";
+    g.beginPath(); g.arc(cx, cy, a > 0.25 ? 2.7 : 1.5, 0, 7); g.fill();
+  }
+  g.fillStyle = "#8497b5"; g.font = `600 10.5px ${FONT}`; g.textAlign = "center";
+  g.fillText("600 Kenyon cells \u00b7 about 10% fire on any tick", x0 + 120, 18);
+  g.fillStyle = "rgba(255,215,0,.9)"; g.fillText("\u25cf speed & gear cells", x0 + 62, H - 8);
+  g.fillStyle = "rgba(61,220,151,.95)"; g.fillText("\u25cf steering cells", x0 + 178, H - 8);
+  // --- what the five output neurons said
+  lab("OUTPUT NEURONS", 530, 18);
+  ["go", "lift", "steer +", "steer \u2212", "shift"].forEach((name, n) => {
+    const y = 48 + n * 38, v = Math.tanh(brainV.pool[n] / 3);
+    g.fillStyle = "#c9d6ec"; g.font = `600 12.5px ${FONT}`; g.textAlign = "left"; g.fillText(name, 530, y + 4);
+    g.fillStyle = "#1b2639"; rr(g, 596, y - 7, 128, 14, 4); g.fill();
+    g.fillStyle = v >= 0 ? "#3ddc97" : "#ff6b6b";
+    g.fillRect(660 + Math.min(0, v * 64), y - 7, Math.abs(v) * 64, 14);
+    g.fillStyle = "#4a5a78"; g.fillRect(659.5, y - 9, 1.5, 18);
+  });
+}
+
+// the evolution view: fastest finish of each generation, and the leader's family
+function drawEvo() {
+  const W = 740, H = 264, g = (drawEvo.g = drawEvo.g || setupCanvas($("#evo"), W, H));
+  g.clearRect(0, 0, W, H);
+  const st = G.state, gens = ((st && st.evolution && st.evolution.gens) || []).filter((x) => x.best_pb).slice(-7);
+  g.textAlign = "left"; g.font = `700 11px ${FONT}`; g.fillStyle = "#8497b5"; g.fillText("FASTEST FINISH OF EACH GENERATION", 20, 22);
+  if (gens.length < 1) {
+    g.font = `600 17px ${FONT}`; g.fillStyle = "#9aa8bf"; g.fillText("The first generation is still learning to finish\u2026", 20, 120);
+  } else {
+    const vals = gens.map((x) => x.best_pb), lo = Math.min(...vals), hi = Math.max(...vals), span = Math.max(hi - lo, 0.4);
+    const top = 56, base = 206, bw = Math.min(54, 420 / gens.length - 12);
+    gens.forEach((x, n) => {
+      const cx = 30 + n * (bw + 14), frac = clamp((hi + span * 0.25 - x.best_pb) / (span * 1.25)), h = 20 + (base - top - 20) * frac;
+      const best = x.best_pb === lo;
+      g.fillStyle = best ? "#ffd700" : "#3a557f"; rr(g, cx, base - h, bw, h, 6); g.fill();
+      g.textAlign = "center"; g.fillStyle = "#fff"; g.font = `700 13px ${MONO}`; g.fillText(x.best_pb.toFixed(2), cx + bw / 2, base - h - 7);
+      g.fillStyle = "#c9d6ec"; g.font = `700 12px ${FONT}`; g.fillText(x.gen === 0 ? "founders" : `gen ${x.gen}`, cx + bw / 2, base + 16);
+      g.fillStyle = "#6b7a93"; g.font = `500 11px ${FONT}`; g.fillText(`${x.flies} flies`, cx + bw / 2, base + 31);
+    });
+    g.textAlign = "left"; g.fillStyle = "#8497b5"; g.font = `500 11.5px ${FONT}`; g.fillText("taller bar = faster (seconds for the dry strip)", 20, 252);
+  }
+  // the leader's family tree
+  const top = st && st.standings.find((s) => !M(s.pid).legend), m = top && M(top.pid);
+  g.textAlign = "left"; g.font = `700 11px ${FONT}`; g.fillStyle = "#8497b5"; g.fillText("FAMILY OF THE LEADER", 520, 22);
+  if (m) {
+    const chain = [...(m.lineage || []), m.name].slice(-5);
+    chain.forEach((nm, n) => {
+      const y = 52 + n * 40, last = n === chain.length - 1;
+      g.fillStyle = last ? "#ffd700" : "#3a557f"; g.beginPath(); g.arc(534, y, last ? 7 : 5, 0, 7); g.fill();
+      if (n) { g.strokeStyle = "#3a557f"; g.lineWidth = 2; g.beginPath(); g.moveTo(534, y - 34); g.lineTo(534, y - 8); g.stroke(); }
+      g.fillStyle = last ? "#fff" : "#9fb4d6"; g.font = `${last ? 700 : 500} ${last ? 15 : 13}px ${FONT}`; g.fillText(nm.length > 24 ? nm.slice(0, 23) + "\u2026" : nm, 552, y + 5);
+    });
+    g.fillStyle = "#6b7a93"; g.font = `500 11.5px ${FONT}`;
+    g.fillText(m.lineage && m.lineage.length ? `generation ${m.gen}: a brain inherited, then trained` : "a founder: no ancestors yet", 520, 252);
+  }
+}
+
 /* ============================================================ timing panel */
 function timingRows(rows, firstGold) {
   const area = 304 - 44 - 8, n = Math.max(rows.length, 1), rh = Math.min(22, Math.floor(area / n));
@@ -742,7 +864,7 @@ function updateTiming(simT, force) {
   const { entries, dt } = R, k = simT / dt;
   const rows = entries.map((e) => ({ e, s: sample(e, k), done: simT >= e.tEnd })).map((r) => ({ ...r, fin: r.done && r.e.result.status === "finished" }));
   rows.sort((a, b) => (a.fin !== b.fin ? (a.fin ? -1 : 1) : a.fin ? a.e.tEnd - b.e.tEnd : b.s.x - a.s.x));
-  const lead = rows[0].s.x;
+  const lead = rows[0].s.x; R.leader = rows[0].e;
   timingRows(rows.map((r, i) => {
     const st = r.e.result.status, base = { p: i + 1, name: r.e.m.name, color: r.e.m.color, face: faceURL(r.e.m) };
     if (r.fin) return { ...base, a: fmtT(R.cls.get(r.e.pid).time), b: "", d: "" };
@@ -906,7 +1028,7 @@ function runRace(live) {
     const step = (now) => {
       const dtw = Math.min(0.1, (now - last) / 1000); last = now;
       R.simT += dtw * (R.simT >= R.ffStart ? R.ff : 1);
-      drawFrame(R.simT); updateTiming(R.simT);
+      drawFrame(R.simT); updateTiming(R.simT); drawBrain(R.simT, R.leader);
       if (R.simT >= R.tEnd + 0.6 || (!live && G.queue.length)) return res();
       requestAnimationFrame(step);
     };
@@ -941,7 +1063,10 @@ async function playRace(race, live) {
   $("#timing-title").textContent = "Live timing"; updateTiming(0, true);
 
   // --- the race
+  const hasBrain = !!R.entries[0].trace.kc;
+  if (hasBrain) { panelLock = true; brainReset(); setView("brain", "recorded live"); }
   await runRace(live);
+  panelLock = false; setView("chart");
   if (!live && G.queue.length) { hideBanner(); return; }
   drawFrame(R.tEnd); await phase(1000);
 

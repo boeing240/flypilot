@@ -204,11 +204,20 @@ def record_race(brain: FlyBrain, scenario: str, seed: int) -> dict:
     env = DragStripEnv(**SCENARIOS[scenario])
     rows = []
 
-    def on_tick(e, k):
-        rows.append((k, e.x, e.y, e.v, e.rpm, e.gear, e.wheel_slip, e.phase))
+    kc_k, kc_idx, kc_pool = [], [], []          # which Kenyon cells fired and what the output pools said, 5 times a second
 
-    res = run_fly_episode(env, brain, SenseEncoder(), ValueDopamineTracker(N_PN), DopamineTracker(),
-                          seed=seed, learn=False, on_tick=on_tick)
+    def on_tick(e, k):
+        th, st, sh, pool, active = brain.last
+        rows.append((k, e.x, e.y, e.v, e.rpm, e.gear, e.wheel_slip, e.phase, th, st, sh))
+        if k % 10 == 0:
+            kc_k.append(k); kc_idx.append([int(i) for i in active]); kc_pool.append([round(float(v), 2) for v in pool])
+
+    brain.trace = True
+    try:
+        res = run_fly_episode(env, brain, SenseEncoder(), ValueDopamineTracker(N_PN), DopamineTracker(),
+                              seed=seed, learn=False, on_tick=on_tick)
+    finally:
+        brain.trace = False
     k_green = next((r[0] for r in rows if r[7] == "green"), 0)
     kept = [r for r in rows if r[0] % 2 == 0]
     if rows[-1] is not kept[-1]:
@@ -226,6 +235,10 @@ def record_race(brain: FlyBrain, scenario: str, seed: int) -> dict:
             "r": [int(r[4]) for r in kept],
             "g": [r[5] for r in kept],
             "s": [round(r[6], 2) for r in kept],
+            "th": [round(r[8], 2) for r in kept],
+            "st": [round(r[9], 2) for r in kept],
+            "sh": [int(r[10]) for r in kept],
+            "kc": {"k": kc_k, "i": kc_idx, "p": kc_pool},
         },
         "result": {
             "status": status,
@@ -345,6 +358,7 @@ class League:
         self.records: dict = {}
         self.events: list[dict] = []
         self.races: list[dict] = []
+        self.gen_stats: dict[int, dict] = {}                    # per generation: flies bred, fastest finish ever
         self.used_names: set[str] = self.load_known_names()   # names of every pilot of every past league
         self.next_pid = 1
         self.pending_events: list[dict] = []
@@ -359,7 +373,7 @@ class League:
 
     def save(self):
         blob = {k: getattr(self, k) for k in ("rng", "gp", "season", "season_gp", "pilots", "history", "records",
-                                              "events", "races", "used_names", "next_pid", "league_seed")}
+                                              "events", "races", "used_names", "next_pid", "league_seed", "gen_stats")}
         data = pickle.dumps(blob)
         if CHECKPOINT_PATH.exists():
             try:                                   # keep the last checkpoint that still loads as the backup
@@ -487,6 +501,7 @@ class League:
         pilot = self._new_pilot(pid, ident, brain, seed)
         if parent is not None:
             pilot.update(gen=parent.get("gen", 0) + 1, parent=parent["name"], parent_pid=parent["id"], origin="offspring",
+                         lineage=(parent.get("lineage", []) + [parent["name"]])[-6:],
                          dl=copy.deepcopy(parent["dl"]), dt=copy.deepcopy(parent["dt"]))
         elif breed:
             pilot["origin"] = "immigrant"
@@ -500,7 +515,17 @@ class League:
         kin = f" (child of {r['parent']})" if r.get("parent") else ""
         return f"{prefix}{r['name']}{kin} joins as #{r['number']}"
 
+    def note_gen(self, p: dict, joined: bool = False) -> None:
+        if p["legend"]:
+            return
+        s = self.gen_stats.setdefault(p.get("gen", 0), {"flies": 0, "best_pb": None, "best_name": None})
+        if joined:
+            s["flies"] += 1
+        if p.get("pb") and (s["best_pb"] is None or p["pb"] < s["best_pb"]):
+            s["best_pb"], s["best_name"] = p["pb"], p["name"]
+
     def log_join(self, p: dict, mutation: dict | None = None) -> None:
+        self.note_gen(p, joined=True)
         analysis.append("pilots", {
             "event": "join", "league": self.league_seed, "pid": p["id"], "name": p["name"], "nation": p["nation"],
             "number": p["number"], "legend": bool(p["legend"]), "gp": self.gp, "origin": p.get("origin"),
@@ -589,7 +614,8 @@ class League:
     def meta(self, p: dict) -> dict:
         return {**{k: p[k] for k in ("name", "nation", "number", "color", "legend", "joined_gp")},
                 "titles": p.get("titles", 0), "peak": round(p.get("peak", p["rating"]), 1),
-                "gen": p.get("gen", 0), "parent": p.get("parent"), "origin": p.get("origin")}
+                "gen": p.get("gen", 0), "parent": p.get("parent"), "origin": p.get("origin"),
+                "lineage": p.get("lineage", [])}
 
     def apply_field_settings(self):
         """Bring the roster in line with the current settings (round boundary only)."""
@@ -687,6 +713,7 @@ class League:
             "totals": {"episodes": sum(p["episodes"] for p in self.trained()), "races": self.gp,
                        "stage_episodes": self.cfg["stage_episodes"]},
             "goal": self.goal.info(),
+            "evolution": {"gens": [{"gen": g, **s} for g, s in sorted(self.gen_stats.items())]},
         })
 
     # -- control (called from the admin API)
@@ -921,6 +948,8 @@ class League:
         events += self.update_stats_and_events(order, raced, scenario, winner_time)
         self.goal.consider(pool, gp, scenario, order, self.pilots, raced)
         events += self.track_form(gp)
+        for q in self.trained():
+            self.note_gen(q)
         self.log_round(gp, season, scenario, order, raced, deltas, rating_before, train_stats)
         after = self.snapshot(before)
         for pid in grid:
