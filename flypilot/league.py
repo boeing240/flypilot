@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import collections
+import copy
 import json
 import os
 import pathlib
@@ -40,8 +41,12 @@ import urllib.parse
 from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
+import numpy as np
+
+from . import analysis
 from .brain import FlyBrain
 from .env import DragStripEnv
+from .evolution import choose_parent, genome, mutate_brain
 from .goal import CANDIDATES, DATA_DIR, ROOT, Goal, archive_file, archive_pilot
 from .learning import DopamineTracker, ValueDopamineTracker
 from .pilots import make_identity
@@ -107,7 +112,8 @@ SETTINGS_SPEC = [
     dict(key="workers", group="Training", label="Worker processes", type="int", min=1, max=CPUS,
          default=max(1, CPUS // 2), apply="round", help=f"Of {CPUS} cores. Leave plenty free for the browser and the stream encoder."),
     dict(key="randomize_prob", group="Training", label="Domain randomization", type="float", min=0, max=1, step=0.05,
-         default=0.0, apply="round", help="Share of training episodes on random traction/engine conditions."),
+         default=0.25, apply="round", help="Share of training episodes on random traction/engine conditions "
+                                                      "(the champion goal is scored over five scenarios, so train for them)."),
 
     dict(key="nominal_share", group="Season", label="Dry-strip share", type="float", min=0, max=1, step=0.05,
          default=0.55, apply="round", help="Fraction of races on perfect conditions; the rest rotate through the harder ones."),
@@ -118,6 +124,16 @@ SETTINGS_SPEC = [
     dict(key="season_carry", group="Season", label="Rating carried into next season", type="float", min=0, max=1, step=0.05,
          default=0.5, apply="round",
          help="At the end of a season every rating is pulled back toward 1500: 1 = keep everything, 0 = full reset, 0.5 = halfway."),
+    dict(key="evolve", group="Evolution", label="Breed new flies from the best", type="bool", default=True, apply="round",
+         help="A rookie is a mutated child of a top fly (or the Legend) instead of a random newcomer."),
+    dict(key="mutation_rate", group="Evolution", label="Mutation strength", type="float", min=0, max=1, step=0.01, default=0.15,
+         apply="round", help="Weight noise as a share of the weights' own spread. 0 = exact clones."),
+    dict(key="immigrant_share", group="Evolution", label="Random newcomers", type="float", min=0, max=1, step=0.05, default=0.25,
+         apply="round", help="Share of rookies that are fully random, to keep the gene pool varied."),
+    dict(key="legend_parent_share", group="Evolution", label="Legend as parent", type="float", min=0, max=1, step=0.05, default=0.25,
+         apply="round", help="Chance that a bred rookie is a child of the reigning champion."),
+    dict(key="revert_gap", group="Evolution", label="Revert to best form (Elo)", type="int", min=0, max=500, default=60,
+         apply="round", help="A fly that falls this far below its peak rating returns to its best brain. 0 = never."),
     dict(key="min_age", group="Season", label="Veteran after (rounds)", type="int", min=1, max=1000, default=12,
          apply="round", help="A pilot must have raced this many rounds before it can retire."),
 
@@ -335,10 +351,11 @@ class League:
 
     def init_field(self):
         self.log(f"new league, seed {self.league_seed}")
+        analysis.append("leagues", {"event": "start", "league": self.league_seed, "gp": self.gp, "cfg": dict(self.cfg)})
         if self.cfg["legend"]:
             self.add_legend()
         while len(self.trained()) < self.cfg["pilots"]:
-            self.add_rookie()
+            self.add_rookie(breed=False)
 
     def save(self):
         blob = {k: getattr(self, k) for k in ("rng", "gp", "season", "season_gp", "pilots", "history", "records",
@@ -397,8 +414,10 @@ class League:
         ident = make_identity(0, names, numbers, colors, legend=True)
         pilot = self._new_pilot("legend", ident, pickle.loads(path.read_bytes()), seed=0)
         pilot["sig"] = self.legend_sig()
+        pilot["origin"] = "legend"
         self.pilots["legend"] = pilot
         self.history["legend"] = [[self.gp, START_RATING]]
+        self.log_join(pilot)
 
     def legend_sig(self):
         try:
@@ -431,19 +450,22 @@ class League:
         lg = self.pilots.get("legend")
         if lg is None:
             return
-        archive_pilot(lg, "dethroned", self.gp)
+        self.archive(lg, "dethroned", self.gp)
         lg["brain"] = pickle.loads((CANDIDATES / f"{out['id']}.pkl").read_bytes())
         lg["name"], lg["nation"] = out["name"], out["nation"]
         lg["sig"] = self.legend_sig()
         cp = self.pilots.pop(out["pid"], None)
         if cp is not None:
-            archive_pilot(cp, "crowned", self.gp)
+            self.archive(cp, "crowned", self.gp)
             self.history.pop(out["pid"], None)
 
-    def add_rookie(self, rating: float | None = None) -> dict:
+    def add_rookie(self, rating: float | None = None, breed: bool = True) -> dict:
         """A new fly takes over a vacated seat *with that seat's rating*, so points are neither created nor lost
         (a rookie entering at a flat 1500 while the retiree sat lower would inflate everybody's rating).
-        With no seat to inherit it starts at the field's lowest rating."""
+        With no seat to inherit it starts at the field's lowest rating.
+
+        With `evolve` on, most rookies are mutated children of a top fly (see evolution.py); the rest are
+        random immigrants. The very first field (breed=False) is all random: nobody has learned anything yet."""
         if rating is None:
             rs = [q["rating"] for q in self.trained()]
             rating = min(rs) if rs else START_RATING
@@ -452,14 +474,78 @@ class League:
         seed = self.rng.randrange(1, 10**9)
         names, numbers, colors = self._taken()
         ident = make_identity(seed, names, numbers, colors)
-        rr = random.Random(seed)
-        brain = FlyBrain(n_pn=N_PN, seed=seed, noise_sigma=round(rr.uniform(0.3, 0.9), 3),
-                         eta=round(rr.uniform(0.01, 0.04), 4), lat_kc_fraction=0.25)
+        parent = None
+        if breed and self.cfg["evolve"] and self.rng.random() >= self.cfg["immigrant_share"]:
+            parent = choose_parent(self.trained(), self.pilots.get("legend"), self.rng, self.cfg["legend_parent_share"])
+        mutation = None
+        if parent is not None:
+            brain, mutation = mutate_brain(parent["brain"], seed, self.cfg["mutation_rate"])
+        else:
+            rr = random.Random(seed)
+            brain = FlyBrain(n_pn=N_PN, seed=seed, noise_sigma=round(rr.uniform(0.3, 0.9), 3),
+                             eta=round(rr.uniform(0.01, 0.04), 4), lat_kc_fraction=0.25)
         pilot = self._new_pilot(pid, ident, brain, seed)
+        if parent is not None:
+            pilot.update(gen=parent.get("gen", 0) + 1, parent=parent["name"], parent_pid=parent["id"], origin="offspring",
+                         dl=copy.deepcopy(parent["dl"]), dt=copy.deepcopy(parent["dt"]))
+        elif breed:
+            pilot["origin"] = "immigrant"
         self.pilots[pid] = pilot
         pilot["rating"] = round(rating, 1)
         self.history[pid] = [[self.gp, pilot["rating"]]]
+        self.log_join(pilot, mutation)
         return pilot
+
+    def rookie_text(self, r: dict, prefix: str = "Rookie ") -> str:
+        kin = f", child of {r['parent']}" if r.get("parent") else ""
+        return f"{prefix}{r['name']} ({r['nation']}{kin}) joins as #{r['number']}"
+
+    def log_join(self, p: dict, mutation: dict | None = None) -> None:
+        analysis.append("pilots", {
+            "event": "join", "league": self.league_seed, "pid": p["id"], "name": p["name"], "nation": p["nation"],
+            "number": p["number"], "legend": bool(p["legend"]), "gp": self.gp, "origin": p.get("origin"),
+            "gen": p.get("gen", 0), "parent": p.get("parent"), "parent_pid": p.get("parent_pid"), "seed": p["seed"],
+            "rating_start": p["rating"], "genome": genome(p["brain"]), "mutation": mutation,
+            "training": {k: self.cfg[k] for k in ("stage_episodes", "randomize_prob", "nominal_share", "mutation_rate",
+                                                   "immigrant_share", "legend_parent_share", "revert_gap", "evolve")}})
+
+    # -- revert to the best brain a fly ever had (the plasticity rule random-walks away from good solutions)
+    def track_form(self, gp: int) -> list[dict]:
+        gap = self.cfg["revert_gap"]
+        events = []
+        if gap <= 0:
+            return events
+        for p in self.trained():
+            snap = p.get("snap")
+            if snap is None or p["rating"] > snap["rating"]:
+                p["snap"] = {"rating": p["rating"], "gp": gp, "brain": copy.deepcopy(p["brain"]),
+                             "dl": copy.deepcopy(p["dl"]), "dt": copy.deepcopy(p["dt"])}
+            elif p["rating"] < snap["rating"] - gap and gp - snap["gp"] >= 3 and gp - p.get("revert_gp", -99) >= 3:
+                p["brain"] = copy.deepcopy(snap["brain"])
+                p["brain"].rng = np.random.default_rng(self.rng.randrange(1, 10**9))
+                p["brain"].eligibility[:] = 0.0
+                p["dl"], p["dt"] = copy.deepcopy(snap["dl"]), copy.deepcopy(snap["dt"])
+                p["revert_gp"], p["reverts"] = gp, p.get("reverts", 0) + 1
+                events.append({"kind": "revert", "pid": p["id"],
+                               "text": f"{p['name']} returns to their best form (peak {snap['rating']:.0f} Elo)"})
+                snap["rating"], snap["gp"] = p["rating"], gp
+        return events
+
+    def log_round(self, gp, season, scenario, order, raced, deltas, rating_before, train_stats) -> None:
+        for pos, pid in enumerate(order, 1):
+            p, r = self.pilots[pid], raced[pid]["result"]
+            ts = train_stats.get(pid)
+            analysis.append("rounds", {
+                "league": self.league_seed, "gp": gp, "season": season, "scenario": scenario, "pid": pid, "name": p["name"],
+                "legend": bool(p["legend"]), "gen": p.get("gen", 0), "origin": p.get("origin"), "pos": pos, "of": len(order),
+                "status": r["status"], "time": round(r["time"], 3) if r["status"] == "finished" else None,
+                "x": round(r["x"], 1), "rating_before": round(rating_before[pid], 1), "rating_after": round(p["rating"], 1),
+                "delta": round(deltas[pid], 2), "episodes": p["episodes"],
+                "eta": round(float(p["brain"].eta), 5), "noise_sigma": round(float(p["brain"].noise_sigma), 4),
+                "train": ts and {"n": ts["n"], "finished": ts["finished"], "crash": ts["crash"], "timeout": ts["timeout"],
+                                 "reward": round(ts["reward"], 2),
+                                 "avg_time": round(ts["time_sum"] / ts["finished"], 3) if ts["finished"] else None},
+                "stage_episodes": self.cfg["stage_episodes"], "randomize_prob": self.cfg["randomize_prob"]})
 
     @staticmethod
     def names_path():
@@ -484,30 +570,42 @@ class League:
             "episodes": 0, "rating": START_RATING, "last_delta": 0.0, "pb": None,
             "wins": 0, "podiums": 0, "races": 0, "finishes": 0, "form": [],
             "joined_gp": self.gp, "beat_legend": False,
+            "gen": 0, "parent": None, "parent_pid": None, "origin": "initial",
         }
+
+    def archive(self, p: dict, reason: str, gp: int) -> None:
+        """Keep the fly's brain (archive/pilots) and write its final line to the analysis log."""
+        archive_pilot(p, reason, gp)
+        analysis.append("pilots", {
+            "event": "exit", "league": self.league_seed, "pid": p["id"], "name": p["name"], "legend": bool(p["legend"]),
+            "reason": reason, "gp": gp, "gen": p.get("gen", 0), "origin": p.get("origin"), "titles": p.get("titles", 0),
+            "reverts": p.get("reverts", 0),
+            "final": {k: (round(p[k], 2) if isinstance(p.get(k), float) else p.get(k))
+                      for k in ("rating", "peak", "episodes", "races", "wins", "podiums", "finishes", "pb")}})
 
     def trained(self) -> list[dict]:
         return [p for p in list(self.pilots.values()) if not p["legend"]]
 
     def meta(self, p: dict) -> dict:
         return {**{k: p[k] for k in ("name", "nation", "number", "color", "legend", "joined_gp")},
-                "titles": p.get("titles", 0), "peak": round(p.get("peak", p["rating"]), 1)}
+                "titles": p.get("titles", 0), "peak": round(p.get("peak", p["rating"]), 1),
+                "gen": p.get("gen", 0), "parent": p.get("parent"), "origin": p.get("origin")}
 
     def apply_field_settings(self):
         """Bring the roster in line with the current settings (round boundary only)."""
         if self.cfg["legend"] and "legend" not in self.pilots:
             self.add_legend()
         elif not self.cfg["legend"] and "legend" in self.pilots:
-            archive_pilot(self.pilots["legend"], "removed", self.gp)
+            self.archive(self.pilots["legend"], "removed", self.gp)
             del self.pilots["legend"]
             self.history.pop("legend", None)
         while len(self.trained()) < self.cfg["pilots"]:
             r = self.add_rookie()
             self.pending_events.append({"kind": "rookie", "pid": r["id"],
-                                       "text": f"{r['name']} ({r['nation']}) joins as #{r['number']}"})
+                                       "text": self.rookie_text(r, "")})
         while len(self.trained()) > self.cfg["pilots"]:
             worst = min(self.trained(), key=lambda p: p["rating"])
-            archive_pilot(worst, "removed", self.gp)
+            self.archive(worst, "removed", self.gp)
             del self.pilots[worst["id"]]
             self.history.pop(worst["id"], None)
             self.pending_events.append({"kind": "retire", "text": f"{worst['name']} leaves the league"})
@@ -658,6 +756,8 @@ class League:
             self.save_settings()
         if changed:
             self.log("settings changed: " + ", ".join(f"{k}={self.cfg[k]}" for k in changed))
+            analysis.append("leagues", {"event": "settings", "league": self.league_seed, "gp": self.gp,
+                                        "changed": {k: self.cfg[k] for k in changed}})
         self.write_live()
         return {"changed": changed, "reset_needed": [k for k in changed if SPEC_BY_KEY[k]["apply"] == "reset"]}
 
@@ -820,6 +920,8 @@ class League:
         self.pending_events = []
         events += self.update_stats_and_events(order, raced, scenario, winner_time)
         self.goal.consider(pool, gp, scenario, order, self.pilots, raced)
+        events += self.track_form(gp)
+        self.log_round(gp, season, scenario, order, raced, deltas, rating_before, train_stats)
         after = self.snapshot(before)
         for pid in grid:
             self.history[pid].append([gp, round(self.pilots[pid]["rating"], 1)])
@@ -859,6 +961,8 @@ class League:
         self.races.append({"id": race_id, "gp": gp, "season": season, "title": title, "conditions": scenario,
                            "winner": order[0], "winner_name": names[order[0]], "time": winner_time, "ts": time.time()})
         self.events.extend({"gp": gp, "ts": time.time(), **e} for e in events)
+        for e in events:
+            analysis.append("events", {"league": self.league_seed, "gp": gp, **e})
         self.prune_races()
         self.save()
         self.write_state()
@@ -958,6 +1062,8 @@ class League:
             return
         for p in self.pilots.values():
             p["rating"] = START_RATING + (p["rating"] - START_RATING) * keep
+            if p.get("snap"):
+                p["snap"]["rating"] = START_RATING + (p["snap"]["rating"] - START_RATING) * keep
         events.append({"kind": "season_reset", "text": "New season: ratings pulled "
                        + ("back to 1500" if keep <= 0 else f"{round((1 - keep) * 100)}% of the way back to 1500")})
 
@@ -970,7 +1076,7 @@ class League:
             if not eligible or len(self.trained()) < 2:
                 break
             worst = min(eligible, key=lambda p: (p["rating"], p["finishes"]))
-            archive_pilot(worst, "retired", gp)
+            self.archive(worst, "retired", gp)
             del self.pilots[worst["id"]]
             self.history.pop(worst["id"], None)
             best = f", best {worst['pb']:.2f} s" if worst["pb"] else ""
@@ -978,7 +1084,7 @@ class League:
                            f"{worst['races']} races{best}"})
             rookie = self.add_rookie(worst["rating"])
             events.append({"kind": "rookie", "pid": rookie["id"],
-                           "text": f"Rookie {rookie['name']} ({rookie['nation']}) joins as #{rookie['number']}"})
+                           "text": self.rookie_text(rookie)})
         self.soft_reset_ratings(events)
         return events
 

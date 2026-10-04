@@ -400,7 +400,7 @@ function renderRank(snap) {
     row.pos.textContent = s.rank;
     const fu = faceURL(m); if (row.face.dataset.u !== fu) { row.face.dataset.u = fu; row.face.src = fu; }
     row.nm.textContent = m.name;
-    row.sub.textContent = `#${m.number}  ·  ${m.nation}  ·  ${s.episodes.toLocaleString("en-US")} eps${m.legend ? "  ·  reigning champion" : ""}${m.titles ? `  ·  ${m.titles}× season champion` : ""}`;
+    row.sub.textContent = `#${m.number}  ·  ${m.nation}  ·  ${s.episodes.toLocaleString("en-US")} eps${m.legend ? "  ·  reigning champion" : ""}${m.titles ? `  ·  ${m.titles}× season champion` : ""}${m.parent ? `  ·  gen ${m.gen}, child of ${m.parent}` : ""}`;
     row.pb.textContent = s.pb ? s.pb.toFixed(2) : "–";
     const f = s.form.slice(-5);
     row.form.innerHTML = Array.from({ length: 5 - f.length }, () => "<i></i>").join("") + f.map((c) => `<i class="${c}"></i>`).join("");

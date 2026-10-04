@@ -80,6 +80,23 @@ also crowns a champion (best rating; titles are kept on the fly and logged in
 `stream_data/archive/seasons.json`), then every rating is pulled part of the way back to 1500
 (*Rating carried into next season*, default 0.5; 1 keeps everything, 0 resets fully).
 
+### Evolution and the analysis log
+
+A rookie is normally a *child* of a good fly: a copy of a top-3 veteran's brain (or, 25% of the time,
+of the reigning Legend) with a small mutation on the weights and on eta / exploration noise
+(`flypilot/evolution.py`). A quarter of the rookies are still random immigrants, and the first field
+is all random. The plasticity rule random-walks away from good solutions, so a fly that falls
+`revert_gap` Elo below its peak returns to its best brain. All of it is set in the admin panel
+(group *Evolution*).
+
+Everything needed to analyse a run later is appended to `stream_data/analysis/*.jsonl` (survives
+resets): `leagues` (full settings at start and every change), `pilots` (origin, parent, generation,
+seed, genome on join; final stats on exit), `rounds` (one line per fly per race: placing, time,
+rating before/after, training stats, eta/noise) and `events`.
+
+    python -m flypilot.analysis                 # offspring vs. random flies, per generation
+    python -m flypilot.analysis --csv out_dir   # flat tables for pandas / a spreadsheet
+
 Rounds run back to back with no dead air: the next round trains while the page
 is still playing the current one (the page reports which round it shows, and
 training stays `lead_rounds` ahead of it). Each round has a start animation
