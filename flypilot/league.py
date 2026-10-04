@@ -497,8 +497,8 @@ class League:
         return pilot
 
     def rookie_text(self, r: dict, prefix: str = "Rookie ") -> str:
-        kin = f", child of {r['parent']}" if r.get("parent") else ""
-        return f"{prefix}{r['name']} ({r['nation']}{kin}) joins as #{r['number']}"
+        kin = f" (child of {r['parent']})" if r.get("parent") else ""
+        return f"{prefix}{r['name']}{kin} joins as #{r['number']}"
 
     def log_join(self, p: dict, mutation: dict | None = None) -> None:
         analysis.append("pilots", {
@@ -1080,7 +1080,7 @@ class League:
             del self.pilots[worst["id"]]
             self.history.pop(worst["id"], None)
             best = f", best {worst['pb']:.2f} s" if worst["pb"] else ""
-            events.append({"kind": "retire", "text": f"{worst['name']} ({worst['nation']}) retires after "
+            events.append({"kind": "retire", "text": f"{worst['name']} retires after "
                            f"{worst['races']} races{best}"})
             rookie = self.add_rookie(worst["rating"])
             events.append({"kind": "rookie", "pid": rookie["id"],

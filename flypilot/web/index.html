@@ -44,6 +44,7 @@
   @keyframes pulse { 50% { opacity: .25; } }
   #season-info { margin-top: 8px; font-size: 15px; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; }
   #record-info { font-size: 14px; color: #b9c7de; margin-top: 3px; }
+  #about-info { font-size: 13px; color: #6fa8ff; margin-top: 3px; letter-spacing: .06em; }
   #record-info b { color: var(--gold); font-family: var(--mono); }
 
   /* ---------- ranking ---------- */
@@ -147,6 +148,13 @@
   .tp .face { border-radius: 50%; background: #0b0f17; }
   .tp.done { color: #e8eef9; background: #11301f; border-color: #1f5a41; border-left-color: var(--c); }
 
+  #between .bn { font-size: 84px; }
+  #between .bn.small { font-size: 48px; }
+  #sci { display: flex; flex-direction: column; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid #22314a; }
+  #sci .sk { font-size: 12px; letter-spacing: .34em; color: #6fa8ff; text-transform: uppercase; margin-bottom: 4px; }
+  #sci canvas { width: 720px; height: 130px; }
+  #sci-fact { width: 780px; min-height: 52px; margin-top: 4px; text-align: center; font-size: 19px; line-height: 1.35; color: #d6e1f3; transition: opacity .5s; }
+  #sci-fact.fade { opacity: 0; }
   #crown { position: absolute; inset: 0; z-index: 7; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
     background: radial-gradient(circle at center, rgba(78,60,4,.94), rgba(8,12,20,.97) 75%); opacity: 0; pointer-events: none; transition: opacity .6s; }
   #crown.show { opacity: 1; }
@@ -204,18 +212,19 @@
         <circle cx="24" cy="15" r="6.5" fill="#ffd700"/>
         <circle cx="21" cy="14" r="2.4" fill="#e5334b"/><circle cx="27" cy="14" r="2.4" fill="#e5334b"/>
       </svg>
-      <div><div class="brand-name" id="league-name">FLY PILOT LEAGUE</div><div class="brand-sub">real fly-brain pilots learning to race &middot; live</div></div>
+      <div><div class="brand-name" id="league-name">FLY PILOT LEAGUE</div><div class="brand-sub">a fruit-fly brain model learning to drive &middot; live research</div></div>
     </div>
     <div id="gpinfo"><div id="gp-title">Connecting&hellip;</div><div id="gp-chips"></div></div>
     <div id="top-right">
       <span id="mode-tag" class="replay"><span class="dot"></span><span id="mode-text">STANDBY</span></span>
       <div id="season-info"></div>
       <div id="record-info"></div>
+      <div id="about-info">open research &middot; github.com/boeing240/flypilot</div>
     </div>
   </div>
 
   <section id="rank" class="panel">
-    <h2>Pilot ranking <span class="tag">ELO</span></h2>
+    <h2>Fly pilots <span class="tag">ranking &middot; ELO</span></h2>
     <div class="head"><span style="width:34px">#</span><span style="width:52px"></span><span style="flex:1;text-align:left">Pilot</span><span style="width:62px">Form</span><span style="width:64px">Best</span><span style="width:92px">Rating</span></div>
     <div id="rank-rows"></div>
   </section>
@@ -227,7 +236,8 @@
     <div id="sweep"></div><div id="wipe"></div>
     <div id="podium"><div class="pk" id="podium-k"></div><div id="podium-body"></div></div>
     <div id="between"><div class="bk" id="bt-k"></div><div class="bn" id="bt-n"></div><div class="bs" id="bt-s"></div>
-      <div class="bbar"><div id="bt-bar"></div></div><div class="btrain" id="bt-train"></div></div>
+      <div class="bbar"><div id="bt-bar"></div></div><div class="btrain" id="bt-train"></div>
+      <div id="sci"><div class="sk">inside a pilot&rsquo;s brain</div><canvas id="sci-cv"></canvas><div id="sci-fact"></div></div></div>
     <div id="crown"><span id="crown-face"></span><div class="ck" id="crown-k">NEW CHAMPION</div><div class="cn" id="crown-n"></div><div class="ct" id="crown-t"></div><div class="cs" id="crown-s"></div></div>
     <canvas id="confetti"></canvas>
   </section>
@@ -400,7 +410,7 @@ function renderRank(snap) {
     row.pos.textContent = s.rank;
     const fu = faceURL(m); if (row.face.dataset.u !== fu) { row.face.dataset.u = fu; row.face.src = fu; }
     row.nm.textContent = m.name;
-    row.sub.textContent = `#${m.number}  ·  ${m.nation}  ·  ${s.episodes.toLocaleString("en-US")} eps${m.legend ? "  ·  reigning champion" : ""}${m.titles ? `  ·  ${m.titles}× season champion` : ""}${m.parent ? `  ·  gen ${m.gen}, child of ${m.parent}` : ""}`;
+    row.sub.textContent = `#${m.number}  ·  ${s.episodes.toLocaleString("en-US")} eps${m.legend ? "  ·  reigning champion" : ""}${m.titles ? `  ·  ${m.titles}× season champion` : ""}${m.parent ? `  ·  gen ${m.gen}, child of ${m.parent}` : ""}`;
     row.pb.textContent = s.pb ? s.pb.toFixed(2) : "–";
     const f = s.form.slice(-5);
     row.form.innerHTML = Array.from({ length: 5 - f.length }, () => "<i></i>").join("") + f.map((c) => `<i class="${c}"></i>`).join("");
@@ -482,8 +492,10 @@ function renderTicker() {
   if (st) {
     const ev = st.events.filter((e) => e.gp <= G.shownGp).slice(-12);
     const text = ev.length ? ev.map((e) => `<b>GP ${e.gp}</b> ${esc(e.text)}`).join("&nbsp;&nbsp;&nbsp;◆&nbsp;&nbsp;&nbsp;") : "Season is about to begin…";
-    if (text !== lastMarq) {
-      lastMarq = text;
+    const scienceText = FACTS.map((f) => `<b>THE SCIENCE</b> ${esc(f)}`).join("&nbsp;&nbsp;&nbsp;◆&nbsp;&nbsp;&nbsp;");
+    const full = text + "&nbsp;&nbsp;&nbsp;◆&nbsp;&nbsp;&nbsp;" + scienceText;
+    if (full !== lastMarq) {
+      lastMarq = full; const text = full;
       const inner = $("#marq-inner");
       inner.innerHTML = text + "&nbsp;&nbsp;&nbsp;◆&nbsp;&nbsp;&nbsp;" + text + "&nbsp;&nbsp;&nbsp;◆&nbsp;&nbsp;&nbsp;";
       inner.style.animation = "none"; void inner.offsetWidth;
@@ -514,6 +526,67 @@ function setHeader(race, live) {
   const n = race.season_len || (G.state && G.state.season_len) || 0;
   $("#season-info").textContent = `Season ${race.season} · round ${race.season_gp}${n ? " / " + n : ""}`;
 }
+
+/* ============================================================ the science: what the viewer is actually watching */
+const FACTS = [
+  "Every pilot is a tiny model of a fruit fly\u2019s mushroom body \u2014 the part of the fly brain that learns.",
+  "Only ~10% of its 600 Kenyon cells fire at any moment: the sparse code real fly brains use.",
+  "No backpropagation. A synapse changes only when a dopamine-like reward signal says things went better than expected.",
+  "Five output pools drive the whole car: go, lift, steer left, steer right, shift.",
+  "An untrained fly cannot finish a single race. Launch, steering and gear shifts are all learned from scratch.",
+  "Rookies are children of the best flies: an inherited brain with a small mutation, then learning during their own lifetime.",
+  "The research goal: one brain that finishes cleanly on a dry strip, with a hot engine, on a cold track, on patchy grip and in the worst case.",
+  "The drag-strip simulator and the brain are written from scratch. Nothing here is a pre-trained model.",
+  "Open source: github.com/boeing240/flypilot",
+];
+const sci = { on: false, raf: 0, g: null, dots: [], last: 0, t0: 0, factAt: 0, fact: 0 };
+const SCI_W = 720, SCI_H = 130, POOL_LABELS = ["go", "lift", "steer \u2190", "steer \u2192", "shift"];
+function sciInit() {
+  sci.g = setupCanvas($("#sci-cv"), SCI_W, SCI_H);
+  let s = 7; const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 600; i++) sci.dots.push({ x: 160 + rnd() * 400, y: 10 + rnd() * 100, a: 0, tgt: 0, inp: (rnd() * 8) | 0, out: (rnd() * 5) | 0 });
+}
+function sciFrame(now) {
+  if (!sci.on) return;
+  const g = sci.g, t = (now - sci.t0) / 1000;
+  if (now - sci.last > 450) {                                              // a new sparse code: ~10% of the cells light up
+    sci.last = now; for (const d of sci.dots) d.tgt = 0;
+    for (let k = 0; k < 60; k++) sci.dots[(Math.random() * 600) | 0].tgt = 1;
+  }
+  g.clearRect(0, 0, SCI_W, SCI_H);
+  const ins = Array.from({ length: 8 }, (_, i) => ({ x: 46, y: 14 + i * 14.5 })), outs = Array.from({ length: 5 }, (_, i) => ({ x: 628, y: 16 + i * 24 }));
+  const load = [0, 0, 0, 0, 0];
+  for (const d of sci.dots) {
+    d.a += (d.tgt - d.a) * 0.18;
+    if (d.a > 0.05) {
+      load[d.out] += d.a;
+      g.strokeStyle = `rgba(111,168,255,${0.16 * d.a})`; g.lineWidth = 0.8;
+      g.beginPath(); g.moveTo(ins[d.inp].x, ins[d.inp].y); g.lineTo(d.x, d.y); g.lineTo(outs[d.out].x, outs[d.out].y); g.stroke();
+    }
+  }
+  const ring = (t % 6) / 6 * 520 - 40;                                       // a dopamine wave sweeping over the cells
+  for (const d of sci.dots) {
+    const near = Math.abs(d.x - 160 - ring) < 26 ? 1 - Math.abs(d.x - 160 - ring) / 26 : 0;
+    g.fillStyle = d.a > 0.3 ? `rgba(${255 - 140 * (1 - near)},${215 - 40 * (1 - near)},${120 + 100 * (1 - near)},${0.4 + 0.6 * d.a})` : `rgba(120,140,175,${0.2 + 0.5 * near})`;
+    g.beginPath(); g.arc(d.x, d.y, d.a > 0.3 ? 2.6 : 1.4, 0, 7); g.fill();
+  }
+  g.fillStyle = "rgba(111,168,255,.9)"; for (const p of ins) { g.beginPath(); g.arc(p.x, p.y, 3.2, 0, 7); g.fill(); }
+  outs.forEach((p, i) => {
+    const b = clamp(load[i] / 14); g.fillStyle = `rgba(61,220,151,${0.25 + 0.75 * b})`; g.beginPath(); g.arc(p.x, p.y, 4 + 4 * b, 0, 7); g.fill();
+    g.fillStyle = "#9fb4d6"; g.font = `600 11px ${FONT}`; g.textAlign = "left"; g.fillText(POOL_LABELS[i], p.x + 14, p.y + 4);
+  });
+  g.font = `600 11px ${FONT}`; g.fillStyle = "#8497b5"; g.textAlign = "center";
+  g.fillText("senses", 46, SCI_H - 3); g.fillText("600 Kenyon cells", 360, SCI_H - 3); g.fillText("outputs", 660, SCI_H - 3);
+  g.fillStyle = "rgba(255,215,0,.85)"; g.fillText("dopamine wave", clamp(160 + ring, 160, 560), 8);
+  if (now - sci.factAt > 7000) {
+    sci.factAt = now; const el = $("#sci-fact"), n = (G.state && G.state.totals && G.state.totals.episodes) || 0;
+    const list = n ? [`These flies have already made ${n.toLocaleString("en-US")} practice runs in this league.`, ...FACTS] : FACTS;
+    el.classList.add("fade"); setTimeout(() => { el.textContent = list[sci.fact++ % list.length]; el.classList.remove("fade"); }, 500);
+  }
+  sci.raf = requestAnimationFrame(sciFrame);
+}
+function sciStart() { if (sci.on) return; if (!sci.g) sciInit(); sci.on = true; sci.t0 = performance.now(); sci.factAt = 0; sci.raf = requestAnimationFrame(sciFrame); }
+function sciStop() { sci.on = false; cancelAnimationFrame(sci.raf); }
 
 /* ============================================================ timing panel */
 function timingRows(rows, firstGold) {
@@ -806,7 +879,7 @@ async function showTitle(pid, kicker, name, big, sub) {
   $("#crown").classList.remove("show"); stopConfetti();
 }
 async function intermission(B, live) {
-  const betw = $("#between"); betw.classList.add("show");
+  const betw = $("#between"); betw.classList.add("show"); sciStart();
   const t0 = performance.now(), total = B.intermission_s;
   for (;;) {
     const left = total - (performance.now() - t0) / 1000, ready = G.queue.length > 0;
@@ -816,7 +889,7 @@ async function intermission(B, live) {
     updateBetween(left > 0 ? "count" : "wait", { left, total });
     await frame();
   }
-  betw.classList.remove("show");
+  betw.classList.remove("show"); sciStop();
 }
 
 /* ============================================================ race playback */
