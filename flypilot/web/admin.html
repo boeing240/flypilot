@@ -118,6 +118,19 @@
     </section>
 
     <section class="card">
+      <h2>Twitch chat &amp; betting <span id="chat-state" style="letter-spacing:.06em;text-transform:none"></span></h2>
+      <div class="field"><label for="c-channel">Channel</label><div class="ctl"><input type="text" id="c-channel" maxlength="25" placeholder="your_channel"></div><div class="help">The Twitch channel whose chat the bot reads (without #).</div></div>
+      <div class="field"><label for="c-nick">Bot account</label><div class="ctl"><input type="text" id="c-nick" maxlength="25" placeholder="bot_or_your_name"></div><div class="help">The account that posts replies (can be your own).</div></div>
+      <div class="field"><label for="c-token">OAuth token</label><div class="ctl"><input type="password" id="c-token" autocomplete="off" placeholder="paste to set / replace"></div><div class="help" id="c-token-help">Needs the scopes chat:read and chat:edit. Stored only on this PC (secrets/chat.json, ignored by git) and never shown again.</div></div>
+      <div class="btns" style="margin-top:10px">
+        <button class="go" id="c-save">Save &amp; connect</button>
+        <button id="c-off">Disconnect</button>
+        <button class="danger" id="c-reset">Reset all wallets&hellip;</button>
+      </div>
+      <p class="note">Betting itself is switched on under <b>Betting</b> in the settings above (virtual coins only: no money, no prizes). The reset button needs a second click.</p>
+    </section>
+
+    <section class="card">
       <h2>Log</h2>
       <div id="log"></div>
     </section>
@@ -212,6 +225,17 @@ async function act(action) {
 $("#b-start").onclick = () => act("start");
 $("#b-pause").onclick = () => act("pause");
 $("#b-save").onclick = save; $("#b-save-top").onclick = save;
+async function chatSave(enabled) {
+  try {
+    const body = { channel: $("#c-channel").value, nick: $("#c-nick").value, enabled };
+    if ($("#c-token").value.trim()) body.token = $("#c-token").value;
+    const r = await api("/api/admin/chat", body);
+    $("#c-token").value = ""; toast(enabled ? `Chat: ${r.status}` : "Chat disconnected"); refresh();
+  } catch (e) { toast("Failed: " + e.message, true); }
+}
+for (const id of ["#c-channel", "#c-nick"]) $(id).addEventListener("input", () => { $(id).dataset.touched = "1"; });
+$("#c-save").onclick = () => chatSave(true);
+$("#c-off").onclick = () => chatSave(false);
 // confirm() is blocked in embedded browsers (OBS docks, app panes), so the dangerous buttons confirm in place: click twice
 function armed(btn, text, fn) {
   const label = btn.innerHTML; let timer = 0, on = false;
@@ -223,6 +247,9 @@ function armed(btn, text, fn) {
 }
 armed($("#b-hard"), "Click again: hard restart now", () => act("hard_restart"));
 armed($("#b-reset"), "Click again: reset now", () => act("reset"));
+armed($("#c-reset"), "Click again: reset all wallets", async () => {
+  try { const r = await api("/api/admin/bets", { action: "reset_wallets" }); toast(r.result); refresh(); } catch (e) { toast("Failed: " + e.message, true); }
+});
 
 /* ---------- status ---------- */
 const fmtDur = (s) => { s = Math.floor(s); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h ? `${h}h ${m}m` : `${m}m ${s % 60}s`; };
@@ -246,6 +273,10 @@ function render(st) {
   $("#s-bar").style.width = st.phase === "training" && lv.total ? (100 * lv.done / lv.total) + "%" : "0";
   fillForm(st.settings);
   $("#roster").innerHTML = st.pilots.map((p, i) => `<tr class="${p.legend ? "legend" : ""}"><td>${p.number}</td><td class="n">${p.legend ? "★ " : ""}${esc(p.name)}</td><td>${p.nation}</td><td class="r">${Math.round(p.rating)}</td><td class="r">${p.episodes.toLocaleString("en-US")}</td><td class="r">${p.races}</td><td class="r">${p.pb ? p.pb.toFixed(2) : "–"}</td></tr>`).join("");
+  const ch = st.chat || {};
+  for (const [id, v] of [["#c-channel", ch.channel], ["#c-nick", ch.nick]]) if (document.activeElement !== $(id) && !$(id).dataset.touched) { $(id).value = v || ""; }
+  $("#c-token").placeholder = ch.token_set ? "token is set (paste to replace)" : "paste to set";
+  $("#chat-state").textContent = ch.enabled ? `(${ch.status}${ch.error ? ": " + ch.error : ""} \u00b7 ${st.wallets || 0} wallets)` : `(off \u00b7 ${st.wallets || 0} wallets)`;
   const g = st.goal || {};
   $("#g-champ").textContent = g.champion_total ? `${g.champion_total.toFixed(2)} s · ${g.champion_crashes} crashes` : "unknown";
   $("#g-verified").textContent = `${g.verified || 0}${g.pending ? ` (+${g.pending} running)` : ""}`;

@@ -198,6 +198,29 @@
   #qr .cap { font-size: 13px; line-height: 1.4; color: #9fb4d6; max-width: 150px; text-align: left; }
   #qr .cap b { color: #fff; font-size: 14px; display: block; }
 
+  #between.betting { padding-right: 724px; }
+  #between.betting #sci, #between.betting #qr { display: none; }
+  #bets { display: none; position: absolute; right: 22px; top: 20px; bottom: 20px; width: 692px; flex-direction: column; padding: 14px 20px;
+    background: rgba(10,15,25,.94); border: 1px solid #2f4468; border-radius: 14px; }
+  #between.betting #bets { display: flex; }
+  #bets .bh { font-size: 13px; letter-spacing: .24em; color: var(--gold); text-transform: uppercase; }
+  #bets .bs2 { font-size: 15.5px; color: #cdd9ee; margin: 5px 0 9px; line-height: 1.4; }
+  #bets .bs2 b { color: #fff; font-family: var(--mono); font-weight: 600; background: #1d2a42; padding: 1px 7px; border-radius: 5px; }
+  .brow { display: grid; grid-template-columns: 30px 190px 1fr 64px 58px; align-items: center; gap: 9px; height: var(--rh, 32px); font-size: 15px; }
+  .brow .face { width: 26px; height: 26px; border-radius: 50%; background: #0b0f17; border: 1.5px solid var(--c); padding: 1px; }
+  .brow .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .brow .nm i { font-style: normal; font-family: var(--mono); color: var(--c); font-weight: 700; margin-right: 6px; }
+  .brow .bar { height: 10px; background: #1b2639; border-radius: 6px; overflow: hidden; }
+  .brow .bar i { display: block; height: 100%; background: var(--c); transition: width .5s; }
+  .brow .pl { font-family: var(--mono); font-size: 14px; color: #9fb4d6; text-align: right; }
+  .brow .px { font-family: var(--mono); color: var(--gold); text-align: right; font-weight: 700; }
+  #bets .bf { margin-top: auto; padding-top: 9px; border-top: 1px solid #22314a; font-size: 13.5px; color: #8497b5; display: flex; justify-content: space-between; }
+  #podium-bets { margin-top: 20px; font-size: 18px; color: #d6e1f3; text-align: center; min-height: 28px; }
+  #podium-bets b { color: var(--gold); }
+  #betsc { position: absolute; left: 0; top: 40px; width: 740px; height: 264px; display: none; }
+  #chartp[data-view="bets"] #betsc { display: block; }
+  #chartp[data-view="bets"] #chart { display: none; }
+
   /* ---------- ticker ---------- */
   #ticker { position: absolute; left: 24px; top: 996px; width: 1872px; height: 60px; display: flex; align-items: stretch; gap: 14px; }
   #ticker > div { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; display: flex; align-items: center; }
@@ -250,9 +273,10 @@
     <div id="card"><div class="k" id="card-k"></div><div class="t" id="card-t"></div><div class="chips" id="card-chips"></div></div>
     <div id="banner"><span id="banner-face"></span><div><div class="k">WINNER</div><div class="v" id="banner-v"></div></div></div>
     <div id="sweep"></div><div id="wipe"></div>
-    <div id="podium"><div class="pk" id="podium-k"></div><div id="podium-body"></div></div>
+    <div id="podium"><div class="pk" id="podium-k"></div><div id="podium-body"></div><div id="podium-bets"></div></div>
     <div id="between"><div class="bk" id="bt-k"></div><div class="bn" id="bt-n"></div><div class="bs" id="bt-s"></div>
       <div class="bbar"><div id="bt-bar"></div></div><div class="btrain" id="bt-train"></div>
+      <div id="bets"></div>
       <div id="qr"><div class="tile"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 29 29" id="qr-svg"><path class="qrline" stroke="#0b0f17" d="M0 0.5h7m2 0h1m2 0h1m2 0h1m1 0h3m2 0h7m-29 1h1m5 0h1m2 0h4m1 0h2m1 0h1m2 0h1m1 0h1m5 0h1m-29 1h1m1 0h3m1 0h1m2 0h1m1 0h1m3 0h1m1 0h1m2 0h1m1 0h1m1 0h3m1 0h1m-29 1h1m1 0h3m1 0h1m6 0h1m4 0h2m2 0h1m1 0h3m1 0h1m-29 1h1m1 0h3m1 0h1m3 0h9m3 0h1m1 0h3m1 0h1m-29 1h1m5 0h1m1 0h2m1 0h1m1 0h3m1 0h3m2 0h1m5 0h1m-29 1h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7m-20 1h1m1 0h2m2 0h1m1 0h1m1 0h2m-21 1h1m2 0h1m1 0h2m1 0h2m1 0h2m2 0h2m2 0h1m1 0h1m1 0h1m-23 1h5m2 0h2m2 0h1m3 0h2m2 0h1m1 0h1m2 0h1m2 0h1m-29 1h1m1 0h1m1 0h1m1 0h5m1 0h1m3 0h2m1 0h3m2 0h4m-28 1h2m5 0h1m6 0h2m2 0h1m1 0h1m3 0h1m1 0h2m-28 1h1m1 0h6m2 0h3m2 0h4m1 0h3m2 0h1m1 0h2m-29 1h4m1 0h1m2 0h1m3 0h1m4 0h5m-22 1h1m2 0h2m1 0h2m2 0h1m5 0h1m1 0h1m1 0h1m1 0h7m-29 1h1m3 0h2m2 0h1m2 0h1m1 0h3m1 0h1m2 0h3m2 0h1m1 0h1m-24 1h3m1 0h1m1 0h5m1 0h3m1 0h1m2 0h1m3 0h1m-26 1h1m2 0h1m1 0h4m5 0h1m1 0h1m1 0h4m1 0h1m2 0h1m-29 1h1m1 0h6m1 0h2m1 0h2m7 0h1m1 0h2m2 0h2m-27 1h1m1 0h1m2 0h1m1 0h5m1 0h3m2 0h2m1 0h2m2 0h2m-29 1h1m5 0h1m1 0h1m1 0h2m2 0h2m2 0h7m1 0h1m-19 1h1m1 0h4m2 0h5m3 0h1m1 0h3m-29 1h7m6 0h2m3 0h1m1 0h1m1 0h1m1 0h1m2 0h1m-28 1h1m5 0h1m1 0h1m1 0h1m1 0h2m1 0h2m3 0h1m3 0h3m-27 1h1m1 0h3m1 0h1m3 0h2m2 0h5m1 0h5m2 0h2m-29 1h1m1 0h3m1 0h1m1 0h1m1 0h3m1 0h1m4 0h2m1 0h6m-28 1h1m1 0h3m1 0h1m2 0h6m1 0h1m2 0h2m3 0h3m1 0h1m-29 1h1m5 0h1m2 0h1m6 0h6m2 0h1m2 0h1m-28 1h7m1 0h2m1 0h3m3 0h1m2 0h6m1 0h1"/></svg></div><div class="cap"><b>Open research</b>scan to read the code and the findings</div></div>
       <div id="sci"><div class="sk">inside a pilot&rsquo;s brain</div><canvas id="sci-cv"></canvas><div id="sci-fact"></div></div></div>
     <div id="crown"><span id="crown-face"></span><div class="ck" id="crown-k">NEW CHAMPION</div><div class="cn" id="crown-n"></div><div class="ct" id="crown-t"></div><div class="cs" id="crown-s"></div></div>
@@ -266,7 +290,7 @@
 
   <section id="chartp" class="panel">
     <h2><span id="chartp-title">Rating progress &middot; chasing the Legend</span><span class="tag" id="chartp-tag"></span></h2>
-    <canvas id="chart"></canvas><canvas id="brain"></canvas><canvas id="evo"></canvas><canvas id="prog"></canvas>
+    <canvas id="chart"></canvas><canvas id="brain"></canvas><canvas id="evo"></canvas><canvas id="prog"></canvas><canvas id="betsc"></canvas>
   </section>
 
   <div id="ticker">
@@ -544,6 +568,32 @@ function setHeader(race, live) {
   $("#season-info").textContent = `Season ${race.season} · round ${race.season_gp}${n ? " / " + n : ""}`;
 }
 
+/* ============================================================ viewer betting (virtual coins) */
+async function betWindow(action, gp) {
+  try {
+    const r = await fetch("/api/bets/window", { method: "POST", headers: { "Content-Type": "application/json", "X-Admin": "1" }, body: JSON.stringify({ action, gp }) });
+    if (r.ok) G.bets = await r.json();
+  } catch (e) { /* the league may be restarting; betting simply stays closed */ }
+  return G.bets;
+}
+let lastBetsHtml = "";
+function renderBets() {
+  const w = G.bets && G.bets.window; if (!w) return;
+  const field = [...w.field].sort((a, b) => b.rating - a.rating), n = Math.max(field.length, 1), rh = Math.min(34, Math.floor(404 / n)), max = Math.max(1, ...field.map((f) => f.pool));
+  const rows = field.map((f) => `<div class="brow" style="--c:${f.color};--rh:${rh}px">${faceImg(f, 26)}<div class="nm"><i>#${f.number}</i>${f.legend ? "\u2605 " : ""}${esc(f.name)}</div>
+    <div class="bar"><i style="width:${100 * f.pool / max}%"></i></div><div class="pl">${f.pool ? f.pool.toLocaleString("en-US") : "\u2013"}</div><div class="px">${f.x ? "\u00d7" + f.x.toFixed(2) : ""}</div></div>`).join("");
+  const html = `<div class="bh">Bets \u00b7 who finishes in the top 3?</div>
+    <div class="bs2">In the Twitch chat type <b>!bet ${field[0] ? field[0].number : 7} 100</b> &mdash; a fly number and your coins. Also <b>!bal</b> <b>!top</b>. Virtual points only.</div>${rows}
+    <div class="bf"><span>${w.bettors} viewer${w.bettors === 1 ? "" : "s"} \u00b7 ${w.total.toLocaleString("en-US")} coins in the pool</span><span>\u00d7 = what a coin returns if it places</span></div>`;
+  if (html !== lastBetsHtml) { lastBetsHtml = html; $("#bets").innerHTML = html; }
+}
+function showPodiumBets(gp) {
+  const l = G.bets && G.bets.last, el = $("#podium-bets");
+  if (!l || l.gp !== gp) { el.innerHTML = ""; return; }
+  const best = (l.top || []).slice(0, 3).map((r) => `${esc(r.user)} <b>+${r.net}</b>`).join(" \u00b7 ");
+  el.innerHTML = l.bettors ? `Bets: ${l.bettors} viewer${l.bettors === 1 ? "" : "s"} \u00b7 ${l.pool.toLocaleString("en-US")} coins${best ? " \u00b7 best: " + best : ""}` : "";
+}
+
 /* ============================================================ the science: what the viewer is actually watching */
 const FACTS = [
   "Every pilot is a tiny model of a fruit fly\u2019s mushroom body \u2014 the part of the fly brain that learns.",
@@ -606,16 +656,17 @@ function sciStart() { if (sci.on) return; if (!sci.g) sciInit(); sci.on = true; 
 function sciStop() { sci.on = false; cancelAnimationFrame(sci.raf); }
 
 /* ============================================================ bottom-right panel: rating chart / the brain at work / evolution */
-const PANEL_TITLE = { progress: "Progress \u00b7 how close are the flies to the Legend?", chart: "Rating progress \u00b7 chasing the Legend", brain: "Inside the brain", evo: "Evolution \u00b7 do the children get faster?" };
+const PANEL_TITLE = { bets: "Top bettors \u00b7 virtual coins", progress: "Progress \u00b7 how close are the flies to the Legend?", chart: "Rating progress \u00b7 chasing the Legend", brain: "Inside the brain", evo: "Evolution \u00b7 do the children get faster?" };
 let panelView = "chart", panelLock = false;
 function setView(v, tag = "") {
   panelView = v; $("#chartp").dataset.view = v;
   $("#chartp-title").textContent = PANEL_TITLE[v]; $("#chartp-tag").textContent = tag;
   if (v === "evo") drawEvo();
   if (v === "progress") drawProgress();
+  if (v === "bets") drawBets();
 }
-const PANEL_ORDER = ["chart", "progress", "evo"];
-setInterval(() => { if (!panelLock) setView(PANEL_ORDER[(PANEL_ORDER.indexOf(panelView) + 1) % PANEL_ORDER.length]); }, 14000);
+const panelOrder = () => ["chart", "progress", "evo", ...(bc().betting ? ["bets"] : [])];
+setInterval(() => { if (!panelLock) { const o = panelOrder(); setView(o[(o.indexOf(panelView) + 1) % o.length]); } }, 14000);
 
 const brainV = { g: null, a: new Float32Array(600), spot: null, spotAt: 0, at: 0, pool: [0, 0, 0, 0, 0] };
 function brainReset() { brainV.a.fill(0); brainV.spot = null; brainV.spotAt = -9; brainV.at = 0; }
@@ -670,6 +721,22 @@ function drawBrain(simT, leaderE) {
     g.fillStyle = v >= 0 ? "#3ddc97" : "#ff6b6b";
     g.fillRect(660 + Math.min(0, v * 64), y - 7, Math.abs(v) * 64, 14);
     g.fillStyle = "#4a5a78"; g.fillRect(659.5, y - 9, 1.5, 18);
+  });
+}
+
+// the leaderboard of chat bettors (virtual coins)
+function drawBets() {
+  const W = 740, H = 264, g = (drawBets.g = drawBets.g || setupCanvas($("#betsc"), W, H));
+  g.clearRect(0, 0, W, H);
+  const top = (G.bets && G.bets.top) || [];
+  g.textAlign = "left"; g.font = `700 11px ${FONT}`; g.fillStyle = "#8497b5"; g.fillText("CHAT BETTORS \u00b7 BET THAT A FLY FINISHES TOP 3 \u00b7 VIRTUAL COINS ONLY", 20, 22);
+  if (!top.length) { g.font = `600 17px ${FONT}`; g.fillStyle = "#9aa8bf"; g.fillText("No bets yet. In the chat type  !bet <number> <coins>", 20, 120); return; }
+  top.slice(0, 8).forEach((t, i) => {
+    const y = 52 + i * 26;
+    g.fillStyle = i === 0 ? "#ffd700" : "#8497b5"; g.font = `700 14px ${MONO}`; g.textAlign = "right"; g.fillText(String(i + 1), 44, y);
+    g.textAlign = "left"; g.fillStyle = "#e8eef9"; g.font = `600 15px ${FONT}`; g.fillText(t.user, 58, y);
+    g.textAlign = "right"; g.fillStyle = "#ffd700"; g.font = `700 15px ${MONO}`; g.fillText(t.coins.toLocaleString("en-US"), 470, y);
+    g.fillStyle = "#6b7a93"; g.font = `500 12px ${FONT}`; g.fillText(`${t.wins} wins \u00b7 ${t.bets} bets`, 640, y);
   });
 }
 
@@ -989,8 +1056,11 @@ function updateBetween(mode, v) {
     $("#bt-k").textContent = "Broadcast paused"; bn.textContent = "❚❚"; bn.className = "bn small";
     $("#bt-s").textContent = "waiting for the admin to resume"; bar.style.width = "0";
   } else if (mode === "count") {
-    $("#bt-k").textContent = "Next round in"; bn.textContent = Math.max(1, Math.ceil(v.left)); bn.className = "bn";
-    $("#bt-s").textContent = `Grand Prix ${nextGp}`; bar.style.width = (100 * (1 - v.left / v.total)) + "%";
+    const bet = G.betLeft !== null && G.betLeft !== undefined;
+    $("#bt-k").textContent = bet ? "Bets close in" : "Next round in";
+    bn.textContent = Math.max(1, Math.ceil(bet ? G.betLeft : v.left)); bn.className = "bn";
+    $("#bt-s").textContent = bet ? `Grand Prix ${nextGp} · top-3 bets` : `Grand Prix ${nextGp}`;
+    bar.style.width = (100 * (1 - (bet ? G.betLeft / Math.max(G.betTotal, 1) : v.left / v.total))) + "%";
   } else {
     const done = new Set(lv.done_pids || []), st = G.state;
     $("#bt-k").textContent = lv.phase === "training" ? "Pilots are training" : "Preparing the grid";
@@ -1025,16 +1095,27 @@ async function showTitle(pid, kicker, name, big, sub) {
 }
 async function intermission(B, live) {
   const betw = $("#between"); betw.classList.add("show"); sciStart();
+  const betting = live && B.betting;
   const t0 = performance.now(), total = B.intermission_s;
+  let betT0 = 0, betAsked = false, lastPoll = 0;
+  G.betLeft = null; G.betTotal = B.betting_s;
   for (;;) {
-    const left = total - (performance.now() - t0) / 1000, ready = G.queue.length > 0;
-    if (left <= 0 && ready) break;
+    const now = performance.now(), left = total - (now - t0) / 1000, ready = G.queue.length > 0;
+    if (betting && ready && !betAsked) {                                   // the next round is known: open the window
+      betAsked = true; betT0 = now; lastBetsHtml = "";
+      betWindow("open", parseInt(String(G.queue[0]).replace(/\D/g, ""), 10)); betw.classList.add("betting");
+    }
+    G.betLeft = betting && betAsked ? B.betting_s - (now - betT0) / 1000 : null;
+    if (betAsked && now - lastPoll > 1000) { lastPoll = now; jget("/api/bets").then((b) => { G.bets = b; }).catch(() => {}); }
+    const betDone = !betting || (betAsked && G.betLeft <= 0);
+    if (left <= 0 && ready && betDone) break;
     if (!live && ready) break;                                           // a replay yields to a fresh round
     if (left <= 0 && !ready && B.idle_replays && G.state && G.state.races.length) break;
-    updateBetween(left > 0 ? "count" : "wait", { left, total });
+    updateBetween(left > 0 || (G.betLeft !== null && G.betLeft > 0) ? "count" : "wait", { left: Math.max(left, G.betLeft || 0), total });
+    if (betAsked) renderBets();
     await frame();
   }
-  betw.classList.remove("show"); sciStop();
+  betw.classList.remove("show", "betting"); sciStop(); G.betLeft = null;
 }
 
 /* ============================================================ race playback */
@@ -1086,6 +1167,7 @@ async function playRace(race, live) {
   $("#timing-title").textContent = "Live timing"; updateTiming(0, true);
 
   // --- the race
+  if (live && B.betting) betWindow("close", race.gp);                    // the green light: no more bets
   const hasBrain = !!R.entries[0].trace.kc;
   if (hasBrain) { panelLock = true; brainReset(); setView("brain", "recorded live"); }
   await runRace(live);
@@ -1103,6 +1185,8 @@ async function playRace(race, live) {
     renderChart({ standings: race.after, history: race.history, maxGp: race.gp }); renderTicker();
   }
   hideBanner(); showPodium(race, live);
+  $("#podium-bets").innerHTML = "";
+  if (live && B.betting) betWindow("reveal", race.gp).then(() => showPodiumBets(race.gp));
   await phase(B.podium_s * 1000, () => !live && G.queue.length > 0);
   hidePodium(); stopConfetti();
   const crownEv = live && (race.events || []).find((e) => e.kind === "champion");
@@ -1173,6 +1257,7 @@ async function poll() {
   try {
     const [st, lv] = await Promise.all([jget("/data/state.json"), jget("/data/live.json").catch(() => null)]);
     G.live = lv; onState(st);
+    if (bc().betting) G.bets = await jget("/api/bets").catch(() => G.bets);
   } catch (err) { $("#gp-title").textContent = "Waiting for the league…"; }
   setTimeout(poll, 1500);
 }

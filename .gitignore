@@ -8,3 +8,4 @@ runs/
 
 # live league stream output (race replays, checkpoints)
 stream_data/
+secrets/
