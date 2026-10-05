@@ -137,8 +137,17 @@ SETTINGS_SPEC = [
                              "the block is kept only if the fly did not get worse. 0 = no check (blocks always kept)."),
     dict(key="accept_margin", group="Evolution", label="Tolerated loss increase (s)", type="float", min=0, max=5, step=0.1, default=0.0,
          apply="round", help="A training block is kept if the average check time grew by no more than this."),
+    dict(key="candidates", group="Evolution", label="Careful candidates per block", type="int", min=1, max=8, default=3,
+         apply="round", help="A good fly (loss under 15) tries this many short, gentle training runs per round and keeps the "
+                             "best one, but only if it is a real improvement."),
+    dict(key="careful_scale", group="Evolution", label="Careful learning strength", type="float", min=0.02, max=0.5, step=0.01,
+         default=0.1, apply="round", help="Learning rate and exploration noise of those gentle runs, as a share of normal."),
+    dict(key="careful_episodes", group="Evolution", label="Episodes per careful run", type="int", min=5, max=60, default=15,
+         apply="round", help="Short runs: a long one wrecks a good brain."),
+    dict(key="min_gain", group="Evolution", label="Minimum gain to keep (s)", type="float", min=0, max=1, step=0.01, default=0.02,
+         apply="round", help="A careful run replaces the brain only if its check loss is lower by at least this much."),
     dict(key="train_scale", group="Evolution", label="Learning strength", type="float", min=0.05, max=1, step=0.05, default=0.5,
-         apply="round", help="Learning rate and exploration noise of a good fly, as a share of normal (an untrained fly always learns at full strength)."),
+         apply="round", help="Learning rate and exploration noise for a fly that is learning the basics (an untrained fly always learns at full strength)."),
     dict(key="min_age", group="Season", label="Veteran after (rounds)", type="int", min=1, max=1000, default=12,
          apply="round", help="A pilot must have raced this many rounds before it can retire."),
 
@@ -285,20 +294,12 @@ def _eval_task(brain, per, seed):
     return eval_loss(brain, per, seed)
 
 
-def _stage_task(brain, dl, dt, episodes, seed, n_eps, randomize_prob, scenario, race_seed,
-                train_scale=1.0, eval_per=0, eval_seed=0, margin=0.0):
-    """Train one pilot for a block of episodes, check it, keep or drop the block, then race it. Runs in a worker
-    process; trackers travel with the brain so value learning carries over.
-
-    The plasticity rule never converges -- left alone it random-walks away from good solutions (a perfect
-    brain was wrecked within 60 episodes in testing). So a block only sticks if, on the same held-out
-    episodes, the fly is not worse afterwards than before."""
-    rng = random.Random(seed * 1_000_003 + episodes)
-    old, old_dl, old_dt = copy.deepcopy(brain), copy.deepcopy(dl), copy.deepcopy(dt)
+def _train_block(brain, dl, dt, n_eps, seed, episodes, randomize_prob, rng, scale):
+    """n_eps learning episodes at `scale` x the fly's learning rate and exploration noise."""
     base_eta, base_sigma = brain.eta, brain.noise_sigma
-    brain.eta, brain.noise_sigma = base_eta * train_scale, base_sigma * train_scale
+    brain.eta, brain.noise_sigma = base_eta * scale, base_sigma * scale
     env, enc = DragStripEnv(), SenseEncoder()
-    stats = {"finished": 0, "crash": 0, "timeout": 0, "time_sum": 0.0, "reward": 0.0}
+    stats = {"finished": 0, "crash": 0, "timeout": 0, "time_sum": 0.0, "reward": 0.0, "n": n_eps}
     for i in range(n_eps):
         if randomize_prob > 0.0 and rng.random() < randomize_prob:
             set_conditions(env, {n: rng.uniform(lo, hi) for n, (lo, hi) in CONDITION_RANGES.items()})
@@ -313,8 +314,46 @@ def _stage_task(brain, dl, dt, episodes, seed, n_eps, randomize_prob, scenario, 
             stats["crash"] += 1
         else:
             stats["timeout"] += 1
-    stats["n"] = n_eps
     brain.eta, brain.noise_sigma = base_eta, base_sigma
+    return stats
+
+
+def _stage_task(brain, dl, dt, episodes, seed, n_eps, randomize_prob, scenario, race_seed,
+                train_scale=1.0, eval_per=0, eval_seed=0, margin=0.0, careful=None):
+    """Train one pilot, check it, keep or drop what training did, then race it. Runs in a worker process;
+    trackers travel with the brain so value learning carries over.
+
+    The plasticity rule never converges -- left alone it random-walks away from good solutions (a perfect
+    brain was wrecked within 60 episodes in testing). So training only sticks if, on the same held-out
+    episodes, the fly is not worse afterwards than before.
+      normal mode  one block of n_eps episodes (a fly that is still learning the basics)
+      careful mode (`careful` = dict(k, scale, eps, min_gain)) for a fly that is already good: k short, gentle
+                   runs from the current brain; the best is kept only if it is a real improvement."""
+    rng = random.Random(seed * 1_000_003 + episodes)
+    if careful and eval_per > 0:
+        before = eval_loss(brain, eval_per, eval_seed)
+        best, stats = None, {"finished": 0, "crash": 0, "timeout": 0, "time_sum": 0.0, "reward": 0.0, "n": 0}
+        for c in range(careful["k"]):
+            cand, cdl, cdt = copy.deepcopy(brain), copy.deepcopy(dl), copy.deepcopy(dt)
+            cand.rng = np.random.default_rng((seed * 131 + episodes + c) % 2_147_483_647)
+            st = _train_block(cand, cdl, cdt, careful["eps"], seed, episodes + c * careful["eps"], randomize_prob, rng,
+                              careful["scale"])
+            for key in stats:
+                stats[key] += st[key]
+            after = eval_loss(cand, eval_per, eval_seed)
+            if best is None or after["loss"] < best[0]["loss"]:
+                best = (after, cand, cdl, cdt)
+        accepted = best[0]["loss"] < before["loss"] - careful["min_gain"]
+        kept = best[0] if accepted else before
+        if accepted:
+            brain, dl, dt = best[1], best[2], best[3]
+        stats["eval"] = {"before": round(before["loss"], 3), "after": round(best[0]["loss"], 3), "accepted": accepted,
+                         "mode": "careful", "loss": kept["loss"], "finish": kept["finish"], "crash": kept["crash"],
+                         "time": kept["time"]}
+        return brain, dl, dt, episodes + stats["n"], stats, record_race(brain, scenario, race_seed)
+
+    old, old_dl, old_dt = copy.deepcopy(brain), copy.deepcopy(dl), copy.deepcopy(dt)
+    stats = _train_block(brain, dl, dt, n_eps, seed, episodes, randomize_prob, rng, train_scale)
     if eval_per > 0:
         before, after = eval_loss(old, eval_per, eval_seed), eval_loss(brain, eval_per, eval_seed)
         accepted = after["loss"] <= before["loss"] + margin
@@ -323,7 +362,8 @@ def _stage_task(brain, dl, dt, episodes, seed, n_eps, randomize_prob, scenario, 
             brain, dl, dt = old, old_dl, old_dt
             brain.rng = np.random.default_rng((seed * 31 + episodes) % 2_147_483_647)   # don't replay the same noise
         stats["eval"] = {"before": round(before["loss"], 3), "after": round(after["loss"], 3), "accepted": accepted,
-                         "loss": kept["loss"], "finish": kept["finish"], "crash": kept["crash"], "time": kept["time"]}
+                         "mode": "normal", "loss": kept["loss"], "finish": kept["finish"], "crash": kept["crash"],
+                         "time": kept["time"]}
     return brain, dl, dt, episodes + n_eps, stats, record_race(brain, scenario, race_seed)
 
 
@@ -589,12 +629,17 @@ class League:
                                                    "immigrant_share", "legend_parent_share", "train_scale", "eval_per_scenario",
                                                    "accept_margin", "evolve")}})
 
+    def careful_for(self, p: dict) -> dict | None:
+        """A fly that is already good (check loss under 15) switches to short, gentle runs."""
+        fit = p.get("fit")
+        if fit is None or fit >= 15 or self.cfg["eval_per_scenario"] <= 0:
+            return None
+        return {"k": self.cfg["candidates"], "scale": self.cfg["careful_scale"], "eps": self.cfg["careful_episodes"],
+                "min_gain": self.cfg["min_gain"]}
+
     def train_scale_for(self, p: dict) -> float:
         """An untrained fly learns at full strength; the better it gets, the gentler (down to `train_scale`)."""
-        base, fit = self.cfg["train_scale"], p.get("fit")
-        if fit is None or fit >= 25:
-            return 1.0
-        return base if fit <= 15 else base + (1.0 - base) * (fit - 15) / 10
+        return 1.0 if p.get("fit") is None or p["fit"] >= 25 else self.cfg["train_scale"]
 
     def record_progress(self, gp: int, legend_eval: dict | None) -> None:
         """One point per round: how good the flies are on the held-out check, next to the Legend's level."""
@@ -971,7 +1016,7 @@ class League:
         per = self.cfg["eval_per_scenario"]
         futures = {pool.submit(_stage_task, p["brain"], p["dl"], p["dt"], p["episodes"], p["seed"],
                                self.cfg["stage_episodes"], self.cfg["randomize_prob"], scenario, race_seed,
-                               self.train_scale_for(p), per, eval_seed, self.cfg["accept_margin"]): p["id"]
+                               self.train_scale_for(p), per, eval_seed, self.cfg["accept_margin"], self.careful_for(p)): p["id"]
                    for p in trained}
         legend_eval = None
         if "legend" in self.pilots and per > 0:
