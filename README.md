@@ -86,8 +86,12 @@ A rookie is normally a *child* of a good fly: a copy of a top-3 veteran's brain 
 of the reigning Legend) with a small mutation on the weights and on eta / exploration noise
 (`flypilot/evolution.py`). A quarter of the rookies are still random immigrants, and the first field
 is all random. The plasticity rule random-walks away from good solutions, so a fly that falls
-`revert_gap` Elo below its peak returns to its best brain. All of it is set in the admin panel
-(group *Evolution*).
+Training blocks are kept only if they help: the plasticity rule random-walks (a perfect brain was
+wrecked within 60 episodes in testing), so after every block a fly is tested on the same frozen
+episodes in all five scenarios before and after, and the block is dropped if it got worse. Parents
+and retirements follow that test loss, not Elo; new flies arrive mostly as random brains (some may
+learn to be good) plus children of the best league flies. All of it is set in the admin panel
+(group *Evolution*). The *Progress* view shows how close the flies are to the Legend on the same test.
 
 Everything needed to analyse a run later is appended to `stream_data/analysis/*.jsonl` (survives
 resets): `leagues` (full settings at start and every change), `pilots` (origin, parent, generation,

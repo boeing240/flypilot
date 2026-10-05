@@ -183,9 +183,9 @@
   #chart { position: absolute; left: 0; top: 40px; width: 740px; height: 264px; }
 
   #chartp h2 { gap: 12px; }
-  #brain, #evo { position: absolute; left: 0; top: 40px; width: 740px; height: 264px; display: none; }
-  #chartp[data-view="brain"] #chart, #chartp[data-view="evo"] #chart { display: none; }
-  #chartp[data-view="brain"] #brain, #chartp[data-view="evo"] #evo { display: block; }
+  #brain, #evo, #prog { position: absolute; left: 0; top: 40px; width: 740px; height: 264px; display: none; }
+  #chartp[data-view="brain"] #chart, #chartp[data-view="evo"] #chart, #chartp[data-view="progress"] #chart { display: none; }
+  #chartp[data-view="brain"] #brain, #chartp[data-view="evo"] #evo, #chartp[data-view="progress"] #prog { display: block; }
   #chartp[data-view="brain"] h2 { color: #8fb8ff; }
 
   #rank-rows { bottom: 74px !important; }
@@ -266,7 +266,7 @@
 
   <section id="chartp" class="panel">
     <h2><span id="chartp-title">Rating progress &middot; chasing the Legend</span><span class="tag" id="chartp-tag"></span></h2>
-    <canvas id="chart"></canvas><canvas id="brain"></canvas><canvas id="evo"></canvas>
+    <canvas id="chart"></canvas><canvas id="brain"></canvas><canvas id="evo"></canvas><canvas id="prog"></canvas>
   </section>
 
   <div id="ticker">
@@ -427,7 +427,7 @@ function renderRank(snap) {
     row.pos.textContent = s.rank;
     const fu = faceURL(m); if (row.face.dataset.u !== fu) { row.face.dataset.u = fu; row.face.src = fu; }
     row.nm.textContent = m.name;
-    row.sub.textContent = `#${m.number}  ·  ${s.episodes.toLocaleString("en-US")} eps${m.legend ? "  ·  reigning champion" : ""}${m.titles ? `  ·  ${m.titles}× season champion` : ""}${m.parent ? `  ·  gen ${m.gen}, child of ${m.parent}` : ""}`;
+    row.sub.textContent = `#${m.number}  ·  ${s.episodes.toLocaleString("en-US")} eps${s.clean != null && !m.legend ? `  ·  ${s.clean}% clean` : ""}${m.legend ? "  ·  reigning champion" : ""}${m.titles ? `  ·  ${m.titles}× season champion` : ""}${m.parent ? `  ·  gen ${m.gen}, child of ${m.parent}` : ""}`;
     row.pb.textContent = s.pb ? s.pb.toFixed(2) : "–";
     const f = s.form.slice(-5);
     row.form.innerHTML = Array.from({ length: 5 - f.length }, () => "<i></i>").join("") + f.map((c) => `<i class="${c}"></i>`).join("");
@@ -606,14 +606,16 @@ function sciStart() { if (sci.on) return; if (!sci.g) sciInit(); sci.on = true; 
 function sciStop() { sci.on = false; cancelAnimationFrame(sci.raf); }
 
 /* ============================================================ bottom-right panel: rating chart / the brain at work / evolution */
-const PANEL_TITLE = { chart: "Rating progress \u00b7 chasing the Legend", brain: "Inside the brain", evo: "Evolution \u00b7 do the children get faster?" };
+const PANEL_TITLE = { progress: "Progress \u00b7 how close are the flies to the Legend?", chart: "Rating progress \u00b7 chasing the Legend", brain: "Inside the brain", evo: "Evolution \u00b7 do the children get faster?" };
 let panelView = "chart", panelLock = false;
 function setView(v, tag = "") {
   panelView = v; $("#chartp").dataset.view = v;
   $("#chartp-title").textContent = PANEL_TITLE[v]; $("#chartp-tag").textContent = tag;
   if (v === "evo") drawEvo();
+  if (v === "progress") drawProgress();
 }
-setInterval(() => { if (!panelLock) setView(panelView === "chart" ? "evo" : "chart"); }, 14000);
+const PANEL_ORDER = ["chart", "progress", "evo"];
+setInterval(() => { if (!panelLock) setView(PANEL_ORDER[(PANEL_ORDER.indexOf(panelView) + 1) % PANEL_ORDER.length]); }, 14000);
 
 const brainV = { g: null, a: new Float32Array(600), spot: null, spotAt: 0, at: 0, pool: [0, 0, 0, 0, 0] };
 function brainReset() { brainV.a.fill(0); brainV.spot = null; brainV.spotAt = -9; brainV.at = 0; }
@@ -669,6 +671,29 @@ function drawBrain(simT, leaderE) {
     g.fillRect(660 + Math.min(0, v * 64), y - 7, Math.abs(v) * 64, 14);
     g.fillStyle = "#4a5a78"; g.fillRect(659.5, y - 9, 1.5, 18);
   });
+}
+
+// the progress view: 100% = the Legend's quality on the same check episodes, 0% = cannot finish
+function drawProgress() {
+  const W = 740, H = 264, g = (drawProgress.g = drawProgress.g || setupCanvas($("#prog"), W, H));
+  g.clearRect(0, 0, W, H);
+  const pts = ((G.state && G.state.progress) || []).filter((p) => p.legend), n = pts.length;
+  g.textAlign = "left"; g.font = `700 11px ${FONT}`; g.fillStyle = "#8497b5"; g.fillText("QUALITY ON THE FIVE-SCENARIO CHECK (Legend = 100%)", 20, 22);
+  if (n < 2) { g.font = `600 17px ${FONT}`; g.fillStyle = "#9aa8bf"; g.fillText("Collecting the first rounds\u2026", 20, 130); return; }
+  const q = (loss, leg) => clamp((30 - loss) / Math.max(30 - leg, 1), -0.2, 1.3) * 100;
+  const mean = pts.map((p) => q(p.mean, p.legend)), best = pts.map((p) => q(p.best, p.legend));
+  const x0 = 48, x1 = 706, y0 = 40, y1 = 222, lo = -20, hi = 130;
+  const X = (i) => x0 + (x1 - x0) * i / (n - 1), Y = (v) => y1 - (y1 - y0) * (v - lo) / (hi - lo);
+  g.font = `500 11px ${MONO}`; g.textAlign = "right";
+  for (const v of [0, 50, 100]) { g.strokeStyle = v === 100 ? "rgba(255,215,0,.55)" : "rgba(255,255,255,.08)"; g.setLineDash(v === 100 ? [6, 5] : []); g.beginPath(); g.moveTo(x0, Y(v)); g.lineTo(x1, Y(v)); g.stroke(); g.setLineDash([]);
+    g.fillStyle = v === 100 ? "#ffd700" : "#61738f"; g.fillText(v + "%", x0 - 6, Y(v) + 4); }
+  const line = (arr, color, w) => { g.strokeStyle = color; g.lineWidth = w; g.beginPath(); arr.forEach((v, i) => (i ? g.lineTo(X(i), Y(v)) : g.moveTo(X(i), Y(v)))); g.stroke(); };
+  line(mean, "#4f7cff", 2.4); line(best, "#3ddc97", 2.4);
+  g.textAlign = "left"; g.font = `700 12px ${FONT}`;
+  g.fillStyle = "#4f7cff"; g.fillText(`\u25cf average fly  ${Math.round(mean[n - 1])}%`, 60, 246);
+  g.fillStyle = "#3ddc97"; g.fillText(`\u25cf best fly  ${Math.round(best[n - 1])}%`, 260, 246);
+  g.fillStyle = "#ffd700"; g.fillText("- - Legend", 430, 246);
+  g.fillStyle = "#6b7a93"; g.font = `500 11px ${FONT}`; g.textAlign = "right"; g.fillText(`GP ${pts[0].gp} \u2013 ${pts[n - 1].gp}`, x1, 246);
 }
 
 // the evolution view: fastest finish of each generation, and the leader's family
