@@ -147,18 +147,3 @@ Run from the repo root (not inside `flypilot/`) so the `flypilot.*` module
 imports resolve. Promote a run's `best.pkl` by copying it to
 `models/flypilot_brain.pkl` and rerunning `evaluate_scenarios` with its
 default paths.
-
-### Viewer betting (virtual coins)
-
-Switch on *Betting* in the admin panel. Chat viewers bet that a fly finishes in the **top three** with
-`!bet <number> <coins|all>` (also `!bal`, `!top`, `!bets`). Virtual points only: no money, no prizes, no cash-out.
-
-* A *place* pool: all stakes go in one pool, losing stakes are shared between the placed flies that had bets,
-  winners split their fly's share by stake and always get their stake back; if nobody backed a placed fly, everyone is refunded.
-* The window opens when the next round is announced, lasts *Betting window (s)* (the pause is stretched to fit),
-  closes at the green light, and pays out when the podium appears. The league holds the result, never the page.
-* Connect Twitch in the admin panel (*Twitch chat & betting*): channel, bot account and an OAuth token with the scopes
-  `chat:read` and `chat:edit`. The token is kept in `secrets/chat.json` (git-ignored, not web-served) and is never shown again.
-* Wallets: `stream_data/bets/wallets.json`, every bet and payout: `stream_data/bets/bets.jsonl`.
-* *Demo viewers* adds fake `demo_*` bettors so the screen can be shown without a chat.
-

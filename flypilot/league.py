@@ -44,9 +44,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import numpy as np
 
 from . import analysis
-from .betting import Betting
 from .brain import FlyBrain
-from .chat import TwitchChat
 from .env import DragStripEnv
 from .evolution import choose_parent, genome, mutate_brain
 from .goal import CANDIDATES, DATA_DIR, ROOT, Goal, archive_file, archive_pilot
@@ -185,21 +183,10 @@ SETTINGS_SPEC = [
          apply="live", help="Flag wipe, podium and confetti."),
     dict(key="idle_replays", group="Broadcast", label="Replay while waiting", type="bool", default=False,
          apply="live", help="If the next round isn't ready, replay an old one instead of showing the training screen."),
-    dict(key="betting", group="Betting", label="Viewer betting (virtual coins)", type="bool", default=False, apply="live",
-         help="Viewers bet that a fly finishes in the top three. Virtual points only: no money, no prizes."),
-    dict(key="betting_s", group="Betting", label="Betting window (s)", type="int", min=8, max=120, default=30, apply="live",
-         help="The pause before a round lasts at least this long while betting is on."),
-    dict(key="start_coins", group="Betting", label="Starting coins", type="int", min=100, max=100000, default=1000,
-         apply="live", help="What a new viewer gets."),
-    dict(key="min_bet", group="Betting", label="Minimum bet", type="int", min=1, max=1000, default=10, apply="live"),
-    dict(key="max_bet", group="Betting", label="Maximum bet", type="int", min=10, max=100000, default=500, apply="live"),
-    dict(key="demo_viewers", group="Betting", label="Demo viewers (fake)", type="bool", default=False, apply="live",
-         help="Fake bettors named demo_*, to show the screen without a chat. They never get a wallet."),
 ]
 SPEC_BY_KEY = {s["key"]: s for s in SETTINGS_SPEC}
 DEFAULTS = {s["key"]: s["default"] for s in SETTINGS_SPEC}
-BROADCAST_KEYS = ("intro_s", "staging_s", "podium_s", "intermission_s", "fast_forward", "animations", "idle_replays",
-                  "betting", "betting_s")
+BROADCAST_KEYS = ("intro_s", "staging_s", "podium_s", "intermission_s", "fast_forward", "animations", "idle_replays")
 
 
 def clean_settings(raw: dict, base: dict) -> dict:
@@ -433,8 +420,6 @@ class League:
         self.abort_req = False
         self.round_gp = 0
         self.goal = Goal(lambda: self.cfg, self.log)
-        self.chat = TwitchChat(lambda user, text: self.bets.handle_chat(user, text), self.log)
-        self.bets = Betting(lambda: self.cfg, self.log, send=lambda msg: self.chat.say(msg))
         self.status = "stopped"            # stopped | running | pausing
         self.phase = "stopped"
         self.thread: threading.Thread | None = None
@@ -799,31 +784,6 @@ class League:
         return self.rng.choice([k for k in SCENARIOS if k != "nominal"])
 
     # -- output
-    def bet_window(self, action: str, gp) -> dict:
-        """Driven by the broadcast page: open when the next round is announced, close at the green light,
-        reveal when the podium is shown. The result is read here, never sent to the page before the reveal."""
-        if not self.cfg["betting"]:
-            return self.bets.state()
-        gp = int(gp) if str(gp).lstrip("-").isdigit() else None
-        if action == "open" and gp:
-            try:
-                race = json.loads((RACES_DIR / f"gp_{gp:04d}.json").read_text(encoding="utf-8"))
-            except (OSError, ValueError):
-                return self.bets.state()
-            field = [{"pid": e["pid"], "number": race["pilots"][e["pid"]]["number"], "name": race["pilots"][e["pid"]]["name"],
-                      "color": race["pilots"][e["pid"]]["color"], "legend": bool(race["pilots"][e["pid"]]["legend"]),
-                      "rating": (race.get("ratings_before") or {}).get(e["pid"], 1500)} for e in race["entries"]]
-            winners = [c["pid"] for c in race["classification"] if c["status"] == "finished"][:3]
-            st = self.bets.open_window(gp, field, winners)
-            if self.cfg["demo_viewers"]:
-                self.bets.run_demo(self.cfg["betting_s"])
-            return st
-        if action == "close":
-            return self.bets.close_window(gp)
-        if action == "reveal":
-            self.bets.reveal(gp)
-        return self.bets.state()
-
     def broadcast(self) -> dict:
         return {**{k: self.cfg[k] for k in BROADCAST_KEYS}, "lead_rounds": self.cfg["lead_rounds"]}
 
@@ -954,7 +914,6 @@ class League:
             "viewer": {"connected": self.viewer_alive(), "gp": self.viewer_gp},
             "uptime": time.time() - self.started_at if self.started_at and self.status != "stopped" else 0,
             "pilots": pilots, "log": list(self.logbuf)[-120:], "goal": self.goal.info(),
-            "chat": self.chat.public(), "wallets": len(self.bets.wallets),
         }
 
     # -- the run loop
@@ -1328,8 +1287,6 @@ class Handler(SimpleHTTPRequestHandler):
             if not self._local():
                 return self._send_json({"error": "admin is local-only"}, 403)
             return self._send_json(self.league.admin_status())
-        if path == "/api/bets":
-            return self._send_json(self.league.bets.state())
         if path in ("/admin", "/admin/"):
             if not self._local():
                 return self._send_json({"error": "admin is local-only"}, 403)
@@ -1346,24 +1303,12 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/viewer":
             self.league.heartbeat(body.get("gp"))
             return self._send_json({"ok": True})
-        if path == "/api/bets/window":                       # the broadcast page only; same guard as the admin
-            if not self._local() or self.headers.get("X-Admin") != "1":
-                return self._send_json({"error": "forbidden"}, 403)
-            return self._send_json(self.league.bet_window(str(body.get("action")), body.get("gp")))
         if path.startswith("/api/admin/"):
             # custom header: a cross-site page can't send it without a CORS preflight we never allow
             if not self._local() or self.headers.get("X-Admin") != "1":
                 return self._send_json({"error": "forbidden"}, 403)
             if path == "/api/admin/settings":
                 return self._send_json(self.league.set_settings(body))
-            if path == "/api/admin/chat":
-                return self._send_json(self.league.chat.configure(body.get("channel"), body.get("nick"), body.get("token"),
-                                                                  body.get("enabled")))
-            if path == "/api/admin/bets":
-                if body.get("action") == "reset_wallets":
-                    self.league.bets.reset_wallets()
-                    return self._send_json({"result": "all wallets reset"})
-                return self._send_json({"error": "unknown action"}, 400)
             if path == "/api/admin/action":
                 act = body.get("action")
                 fn = {"start": self.league.start, "pause": self.league.pause, "reset": self.league.reset,
@@ -1433,7 +1378,6 @@ def main():
     if not args.no_serve:
         serve(league, args.host, args.port)
         league.log(f"viewer http://{args.host}:{args.port}/   admin http://{args.host}:{args.port}/admin")
-    league.chat.restart()                                  # only connects if the admin panel has the settings and a token
     league.log("stopped -- press Start in the admin panel")        # a run is always started from the admin
 
     try:
