@@ -427,7 +427,7 @@ function renderRank(snap) {
     row.pos.textContent = s.rank;
     const fu = faceURL(m); if (row.face.dataset.u !== fu) { row.face.dataset.u = fu; row.face.src = fu; }
     row.nm.textContent = m.name;
-    row.sub.textContent = `#${m.number}  ·  ${s.episodes.toLocaleString("en-US")} eps${s.clean != null && !m.legend ? `  ·  ${s.clean}% clean` : ""}${m.legend ? "  ·  reigning champion" : ""}${m.titles ? `  ·  ${m.titles}× season champion` : ""}${m.parent ? `  ·  gen ${m.gen}, child of ${m.parent}` : ""}`;
+    row.sub.textContent = `#${m.number}  ·  ${s.episodes.toLocaleString("en-US")} eps${s.clean != null && !m.legend ? `  ·  ${s.clean}% clean` : ""}${m.n_kc && m.n_kc !== 600 ? `  ·  ${m.n_kc} cells` : ""}${m.legend ? "  ·  reigning champion" : ""}${m.titles ? `  ·  ${m.titles}× season champion` : ""}${m.parent ? `  ·  gen ${m.gen}, child of ${m.parent}` : ""}`;
     row.pb.textContent = s.pb ? s.pb.toFixed(2) : "–";
     const f = s.form.slice(-5);
     row.form.innerHTML = Array.from({ length: 5 - f.length }, () => "<i></i>").join("") + f.map((c) => `<i class="${c}"></i>`).join("");
@@ -547,7 +547,7 @@ function setHeader(race, live) {
 /* ============================================================ the science: what the viewer is actually watching */
 const FACTS = [
   "Every pilot is a tiny model of a fruit fly\u2019s mushroom body \u2014 the part of the fly brain that learns.",
-  "Only ~10% of its 600 Kenyon cells fire at any moment: the sparse code real fly brains use.",
+  "Only ~10% of a pilot\u2019s Kenyon cells (600 to 2400, depending on the fly) fire at any moment: the sparse code real fly brains use.",
   "No backpropagation. A synapse changes only when a dopamine-like reward signal says things went better than expected.",
   "Five output pools drive the whole car: go, lift, steer left, steer right, shift.",
   "An untrained fly cannot finish a single race. Launch, steering and gear shifts are all learned from scratch.",
@@ -593,7 +593,7 @@ function sciFrame(now) {
     g.fillStyle = "#9fb4d6"; g.font = `600 11px ${FONT}`; g.textAlign = "left"; g.fillText(POOL_LABELS[i], p.x + 14, p.y + 4);
   });
   g.font = `600 11px ${FONT}`; g.fillStyle = "#8497b5"; g.textAlign = "center";
-  g.fillText("senses", 46, SCI_H - 3); g.fillText("600 Kenyon cells", 360, SCI_H - 3); g.fillText("outputs", 660, SCI_H - 3);
+  g.fillText("senses", 46, SCI_H - 3); g.fillText("Kenyon cells", 360, SCI_H - 3); g.fillText("outputs", 660, SCI_H - 3);
   g.fillStyle = "rgba(255,215,0,.85)"; g.fillText("dopamine wave", clamp(160 + ring, 160, 560), 8);
   if (now - sci.factAt > 7000) {
     sci.factAt = now; const el = $("#sci-fact"), n = (G.state && G.state.totals && G.state.totals.episodes) || 0;
@@ -617,7 +617,7 @@ function setView(v, tag = "") {
 const PANEL_ORDER = ["chart", "progress", "evo"];
 setInterval(() => { if (!panelLock) setView(PANEL_ORDER[(PANEL_ORDER.indexOf(panelView) + 1) % PANEL_ORDER.length]); }, 14000);
 
-const brainV = { g: null, a: new Float32Array(600), spot: null, spotAt: 0, at: 0, pool: [0, 0, 0, 0, 0] };
+const brainV = { g: null, a: new Float32Array(2400), spot: null, spotAt: 0, at: 0, pool: [0, 0, 0, 0, 0] };
 function brainReset() { brainV.a.fill(0); brainV.spot = null; brainV.spotAt = -9; brainV.at = 0; }
 // the fly in front gets the spotlight (with a short dwell so it doesn't flicker when two cars swap places)
 function drawBrain(simT, leaderE) {
@@ -633,7 +633,8 @@ function drawBrain(simT, leaderE) {
   const act = done ? [] : kc.i[j]; brainV.pool = done ? [0, 0, 0, 0, 0] : kc.p[j];
   $("#chartp-title").textContent = `Inside ${e.m.name}\u2019s brain`; $("#chartp-tag").textContent = "recorded live";
   g.clearRect(0, 0, W, H);
-  const lit = new Uint8Array(600); for (const n of act) lit[n] = 1;
+  const NK = kc.n || 600, NLAT = kc.lat != null ? kc.lat : 150;                         // brains come in different sizes
+  const lit = new Uint8Array(NK); for (const n of act) if (n < NK) lit[n] = 1;
   // --- the controls the brain is producing
   const lab = (t, x, y, c = "#8497b5") => { g.fillStyle = c; g.font = `700 11px ${FONT}`; g.textAlign = "left"; g.fillText(t, x, y); };
   lab("THROTTLE", 16, 34); g.fillStyle = "#1b2639"; rr(g, 16, 40, 222, 14, 4); g.fill();
@@ -649,16 +650,17 @@ function drawBrain(simT, leaderE) {
   g.fillStyle = sh ? "#1a1000" : "#4a5a78"; g.font = `800 14px ${FONT}`; g.textAlign = "center"; g.fillText("SHIFT", 109, 163);
   lab("SPEED", 16, 204); g.fillStyle = "#e8eef9"; g.font = `800 30px ${MONO}`; g.textAlign = "left"; g.fillText(`${Math.round(s.v * 3.6)}`, 16, 236);
   g.fillStyle = "#8497b5"; g.font = `600 13px ${FONT}`; g.fillText("km/h", 82, 236);
-  // --- the 600 Kenyon cells: lit = firing on this very tick of the recorded run
-  const x0 = 262, y0 = 30, dx = 8, dy = 9.4;
-  for (let n = 0; n < 600; n++) {
+  // --- the Kenyon cells: lit = firing on this very tick of the recorded run (the grid adapts to the brain's size)
+  const x0 = 262, y0 = 30, areaW = 240, areaH = 196, cols = Math.ceil(Math.sqrt(NK * areaW / areaH)), rows = Math.ceil(NK / cols);
+  const dx = areaW / cols, dy = areaH / rows, rad = Math.max(0.9, 1.5 * Math.sqrt(600 / NK) * 1.0), radOn = Math.max(1.6, 2.7 * Math.sqrt(600 / NK));
+  for (let n = 0; n < NK; n++) {
     const on = lit[n]; brainV.a[n] += (on - brainV.a[n]) * 0.55;
-    const a = brainV.a[n], lat = n >= 450, cx = x0 + (n % 30) * dx + 4, cy = y0 + Math.floor(n / 30) * dy + (lat ? 6 : 0);
+    const a = brainV.a[n], lat = n >= NK - NLAT, cx = x0 + (n % cols) * dx + dx / 2, cy = y0 + Math.floor(n / cols) * dy + (lat ? 6 : 0);
     g.fillStyle = a > 0.25 ? (lat ? `rgba(61,220,151,${0.45 + 0.55 * a})` : `rgba(255,215,0,${0.45 + 0.55 * a})`) : "rgba(110,130,165,.28)";
-    g.beginPath(); g.arc(cx, cy, a > 0.25 ? 2.7 : 1.5, 0, 7); g.fill();
+    g.beginPath(); g.arc(cx, cy, a > 0.25 ? radOn : rad, 0, 7); g.fill();
   }
   g.fillStyle = "#8497b5"; g.font = `600 10.5px ${FONT}`; g.textAlign = "center";
-  g.fillText("600 Kenyon cells \u00b7 about 10% fire on any tick", x0 + 120, 18);
+  g.fillText(`${NK} Kenyon cells \u00b7 about 10% fire on any tick`, x0 + 120, 18);
   g.fillStyle = "rgba(255,215,0,.9)"; g.fillText("\u25cf speed & gear cells", x0 + 62, H - 8);
   g.fillStyle = "rgba(61,220,151,.95)"; g.fillText("\u25cf steering cells", x0 + 178, H - 8);
   // --- what the five output neurons said
@@ -688,11 +690,16 @@ function drawProgress() {
   for (const v of [0, 50, 100]) { g.strokeStyle = v === 100 ? "rgba(255,215,0,.55)" : "rgba(255,255,255,.08)"; g.setLineDash(v === 100 ? [6, 5] : []); g.beginPath(); g.moveTo(x0, Y(v)); g.lineTo(x1, Y(v)); g.stroke(); g.setLineDash([]);
     g.fillStyle = v === 100 ? "#ffd700" : "#61738f"; g.fillText(v + "%", x0 - 6, Y(v) + 4); }
   const line = (arr, color, w) => { g.strokeStyle = color; g.lineWidth = w; g.beginPath(); arr.forEach((v, i) => (i ? g.lineTo(X(i), Y(v)) : g.moveTo(X(i), Y(v)))); g.stroke(); };
+  const unseen = pts.map((p) => (p.gmean != null && p.glegend ? q(p.gmean, p.glegend) : null));
   line(mean, "#4f7cff", 2.4); line(best, "#3ddc97", 2.4);
+  g.strokeStyle = "#ff9f43"; g.lineWidth = 2.2; g.beginPath(); let pen = false;
+  unseen.forEach((v, i) => { if (v === null) { pen = false; return; } pen ? g.lineTo(X(i), Y(v)) : g.moveTo(X(i), Y(v)); pen = true; }); g.stroke();
+  const lastU = [...unseen].reverse().find((v) => v !== null);
   g.textAlign = "left"; g.font = `700 12px ${FONT}`;
-  g.fillStyle = "#4f7cff"; g.fillText(`\u25cf average fly  ${Math.round(mean[n - 1])}%`, 60, 246);
-  g.fillStyle = "#3ddc97"; g.fillText(`\u25cf best fly  ${Math.round(best[n - 1])}%`, 260, 246);
-  g.fillStyle = "#ffd700"; g.fillText("- - Legend", 430, 246);
+  g.fillStyle = "#4f7cff"; g.fillText(`\u25cf average  ${Math.round(mean[n - 1])}%`, 40, 246);
+  g.fillStyle = "#3ddc97"; g.fillText(`\u25cf best fly  ${Math.round(best[n - 1])}%`, 170, 246);
+  if (lastU !== undefined) { g.fillStyle = "#ff9f43"; g.fillText(`\u25cf unseen conditions  ${Math.round(lastU)}%`, 300, 246); }
+  g.fillStyle = "#ffd700"; g.fillText("- - Legend", 500, 246);
   g.fillStyle = "#6b7a93"; g.font = `500 11px ${FONT}`; g.textAlign = "right"; g.fillText(`GP ${pts[0].gp} \u2013 ${pts[n - 1].gp}`, x1, 246);
 }
 

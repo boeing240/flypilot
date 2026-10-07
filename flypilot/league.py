@@ -132,6 +132,14 @@ SETTINGS_SPEC = [
          apply="round", help="Share of rookies that are fully random brains; the rest are children of the best flies."),
     dict(key="legend_parent_share", group="Evolution", label="Legend as parent", type="float", min=0, max=1, step=0.05, default=0.0,
          apply="round", help="Chance that a bred rookie is a child of the reigning champion (0 = never)."),
+    dict(key="big_brain_1200", group="Evolution", label="Newcomers with 1200 cells", type="float", min=0, max=1, step=0.05,
+         default=0.4, apply="round", help="Share of random newcomers with a bigger mushroom body (1200 Kenyon cells). "
+                                          "Children keep their parent's size."),
+    dict(key="big_brain_2400", group="Evolution", label="Newcomers with 2400 cells", type="float", min=0, max=1, step=0.05,
+         default=0.2, apply="round", help="Share of random newcomers with the biggest mushroom body (2400 cells). The rest have 600."),
+    dict(key="gauntlet_episodes", group="Evolution", label="Unseen-condition check (episodes)", type="int", min=0, max=24, default=8,
+         apply="round", help="After each round every fly is also tested on this many episodes in conditions it never trained on "
+                             "(wider grip/engine/surface ranges). Logged and shown in Progress. 0 = off."),
     dict(key="eval_per_scenario", group="Evolution", label="Check episodes per scenario", type="int", min=0, max=6, default=2,
          apply="round", help="After each training block a fly is tested on this many frozen episodes in each of the five scenarios; "
                              "the block is kept only if the fly did not get worse. 0 = no check (blocks always kept)."),
@@ -252,7 +260,7 @@ def record_race(brain: FlyBrain, scenario: str, seed: int) -> dict:
             "th": [round(r[8], 2) for r in kept],
             "st": [round(r[9], 2) for r in kept],
             "sh": [int(r[10]) for r in kept],
-            "kc": {"k": kc_k, "i": kc_idx, "p": kc_pool},
+            "kc": {"k": kc_k, "i": kc_idx, "p": kc_pool, "n": int(brain.n_kc), "lat": int(brain.kc_group.sum())},
         },
         "result": {
             "status": status,
@@ -290,8 +298,25 @@ def eval_loss(brain: FlyBrain, per: int, seed: int) -> dict:
             "time": sum(times) / len(times) if times else None}
 
 
-def _eval_task(brain, per, seed):
-    return eval_loss(brain, per, seed)
+def gauntlet_loss(brain: FlyBrain, n: int, seed: int) -> float:
+    """Frozen-policy loss on `n` conditions wider than anything in training (grip 0.45-1.05, engine 0.6-1.05,
+    surface noise 0-0.6), same loss definition as eval_loss. The same conditions for every fly in a round."""
+    r = random.Random(seed)
+    loss = []
+    for i in range(n):
+        env = DragStripEnv()
+        set_conditions(env, {"traction_scale": r.uniform(0.45, 1.05), "engine_power_scale": r.uniform(0.6, 1.05),
+                             "traction_noise_sigma": r.uniform(0.0, 0.6)})
+        res = run_fly_episode(env, brain, SenseEncoder(), ValueDopamineTracker(N_PN), DopamineTracker(), seed=seed + 7 * i, learn=False)
+        loss.append(res["elapsed_time"] if res["phase"] == "finished" else 40.0 if res["phase"] == "crash" else 30.0)
+    return sum(loss) / max(len(loss), 1)
+
+
+def _eval_task(brain, per, seed, gaunt_n=0):
+    out = eval_loss(brain, per, seed)
+    if gaunt_n > 0:
+        out["gauntlet"] = gauntlet_loss(brain, gaunt_n, seed)
+    return out
 
 
 def _train_block(brain, dl, dt, n_eps, seed, episodes, randomize_prob, rng, scale):
@@ -319,7 +344,7 @@ def _train_block(brain, dl, dt, n_eps, seed, episodes, randomize_prob, rng, scal
 
 
 def _stage_task(brain, dl, dt, episodes, seed, n_eps, randomize_prob, scenario, race_seed,
-                train_scale=1.0, eval_per=0, eval_seed=0, margin=0.0, careful=None):
+                train_scale=1.0, eval_per=0, eval_seed=0, margin=0.0, careful=None, gaunt_n=0):
     """Train one pilot, check it, keep or drop what training did, then race it. Runs in a worker process;
     trackers travel with the brain so value learning carries over.
 
@@ -350,6 +375,8 @@ def _stage_task(brain, dl, dt, episodes, seed, n_eps, randomize_prob, scenario, 
         stats["eval"] = {"before": round(before["loss"], 3), "after": round(best[0]["loss"], 3), "accepted": accepted,
                          "mode": "careful", "loss": kept["loss"], "finish": kept["finish"], "crash": kept["crash"],
                          "time": kept["time"]}
+        if gaunt_n > 0:
+            stats["eval"]["gauntlet"] = gauntlet_loss(brain, gaunt_n, eval_seed)
         return brain, dl, dt, episodes + stats["n"], stats, record_race(brain, scenario, race_seed)
 
     old, old_dl, old_dt = copy.deepcopy(brain), copy.deepcopy(dl), copy.deepcopy(dt)
@@ -364,6 +391,8 @@ def _stage_task(brain, dl, dt, episodes, seed, n_eps, randomize_prob, scenario, 
         stats["eval"] = {"before": round(before["loss"], 3), "after": round(after["loss"], 3), "accepted": accepted,
                          "mode": "normal", "loss": kept["loss"], "finish": kept["finish"], "crash": kept["crash"],
                          "time": kept["time"]}
+        if gaunt_n > 0:
+            stats["eval"]["gauntlet"] = gauntlet_loss(brain, gaunt_n, eval_seed)
     return brain, dl, dt, episodes + n_eps, stats, record_race(brain, scenario, race_seed)
 
 
@@ -590,7 +619,9 @@ class League:
             brain, mutation = mutate_brain(parent["brain"], seed, self.cfg["mutation_rate"])
         else:
             rr = random.Random(seed)
-            brain = FlyBrain(n_pn=N_PN, seed=seed, noise_sigma=round(rr.uniform(0.3, 0.9), 3),
+            u = random.Random(seed ^ 0x5EED).random()                       # brain size: 2400 / 1200 / else 600 Kenyon cells
+            n_kc = 2400 if u < self.cfg["big_brain_2400"] else 1200 if u < self.cfg["big_brain_2400"] + self.cfg["big_brain_1200"] else 600
+            brain = FlyBrain(n_pn=N_PN, n_kc=n_kc, seed=seed, noise_sigma=round(rr.uniform(0.3, 0.9), 3),
                              eta=round(rr.uniform(0.01, 0.04), 4), lat_kc_fraction=0.25)
         pilot = self._new_pilot(pid, ident, brain, seed)
         if parent is not None:
@@ -646,7 +677,10 @@ class League:
         fits = [p["fit"] for p in self.trained() if p.get("fit") is not None]
         if not fits:
             return
+        gs = [p["gaunt"] for p in self.trained() if p.get("gaunt") is not None]
         self.progress.append({"gp": gp, "mean": round(sum(fits) / len(fits), 3), "best": round(min(fits), 3),
+                              "gmean": round(sum(gs) / len(gs), 3) if gs else None,
+                              "glegend": round(legend_eval["gauntlet"], 3) if legend_eval and legend_eval.get("gauntlet") is not None else None,
                               "clean": round(sum(p.get("clean", 0) for p in self.trained()) / max(len(self.trained()), 1), 1),
                               "legend": round(legend_eval["loss"], 3) if legend_eval else None})
         del self.progress[:-600]
@@ -657,7 +691,8 @@ class League:
             ts = train_stats.get(pid)
             analysis.append("rounds", {
                 "league": self.league_seed, "gp": gp, "season": season, "scenario": scenario, "pid": pid, "name": p["name"],
-                "legend": bool(p["legend"]), "gen": p.get("gen", 0), "origin": p.get("origin"), "pos": pos, "of": len(order),
+                "legend": bool(p["legend"]), "gen": p.get("gen", 0), "origin": p.get("origin"), "n_kc": int(p["brain"].n_kc),
+                "pos": pos, "of": len(order),
                 "status": r["status"], "time": round(r["time"], 3) if r["status"] == "finished" else None,
                 "x": round(r["x"], 1), "rating_before": round(rating_before[pid], 1), "rating_after": round(p["rating"], 1),
                 "delta": round(deltas[pid], 2), "episodes": p["episodes"],
@@ -712,7 +747,7 @@ class League:
         return {**{k: p[k] for k in ("name", "nation", "number", "color", "legend", "joined_gp")},
                 "titles": p.get("titles", 0), "peak": round(p.get("peak", p["rating"]), 1),
                 "gen": p.get("gen", 0), "parent": p.get("parent"), "origin": p.get("origin"),
-                "lineage": p.get("lineage", [])}
+                "lineage": p.get("lineage", []), "n_kc": int(p["brain"].n_kc)}
 
     def apply_field_settings(self):
         """Bring the roster in line with the current settings (round boundary only)."""
@@ -1016,11 +1051,12 @@ class League:
         per = self.cfg["eval_per_scenario"]
         futures = {pool.submit(_stage_task, p["brain"], p["dl"], p["dt"], p["episodes"], p["seed"],
                                self.cfg["stage_episodes"], self.cfg["randomize_prob"], scenario, race_seed,
-                               self.train_scale_for(p), per, eval_seed, self.cfg["accept_margin"], self.careful_for(p)): p["id"]
+                               self.train_scale_for(p), per, eval_seed, self.cfg["accept_margin"], self.careful_for(p),
+                               self.cfg["gauntlet_episodes"]): p["id"]
                    for p in trained}
         legend_eval = None
         if "legend" in self.pilots and per > 0:
-            futures[pool.submit(_eval_task, self.pilots["legend"]["brain"], per, eval_seed)] = "__legend__"
+            futures[pool.submit(_eval_task, self.pilots["legend"]["brain"], per, eval_seed, self.cfg["gauntlet_episodes"])] = "__legend__"
         raced = {}
         if "legend" in self.pilots:
             raced["legend"] = record_race(self.pilots["legend"]["brain"], scenario, race_seed)
@@ -1044,6 +1080,8 @@ class League:
                 if ev:
                     p["fit"] = ev["loss"] if p.get("fit") is None else 0.5 * p["fit"] + 0.5 * ev["loss"]
                     p["clean"], p["blocks"] = ev["finish"], p.get("blocks", 0) + 1
+                    if ev.get("gauntlet") is not None:
+                        p["gaunt"] = ev["gauntlet"] if p.get("gaunt") is None else 0.5 * p["gaunt"] + 0.5 * ev["gauntlet"]
                     p["accepted"] = p.get("accepted", 0) + (1 if ev["accepted"] else 0)
                 done_pids.append(pid)
                 self.write_live("training", len(done_pids), len(trained), done_pids, gp)

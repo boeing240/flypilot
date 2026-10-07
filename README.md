@@ -93,6 +93,13 @@ and retirements follow that test loss, not Elo; new flies arrive mostly as rando
 learn to be good) plus children of the best league flies. All of it is set in the admin panel
 (group *Evolution*). The *Progress* view shows how close the flies are to the Legend on the same test.
 
+Random newcomers come in three brain sizes (600 / 1200 / 2400 Kenyon cells, shares set in the admin
+panel); children keep their parent's size. In a small offline test bigger brains reached lower losses than
+600 cells (which stalled around 14), at a higher cost per round and with more variance, so the league now
+compares them for real: `python -m flypilot.analysis` ends with a table per size (how many reached a loss
+under 12, after how many blocks, best/recent loss, and loss on *unseen conditions* -- grip, engine and
+surface roughness outside the training ranges, tested after every round).
+
 Everything needed to analyse a run later is appended to `stream_data/analysis/*.jsonl` (survives
 resets): `leagues` (full settings at start and every change), `pilots` (origin, parent, generation,
 seed, genome on join; final stats on exit), `rounds` (one line per fly per race: placing, time,

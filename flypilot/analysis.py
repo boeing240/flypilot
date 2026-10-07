@@ -115,7 +115,38 @@ def summary() -> str:
                     vals.append(sum(r["rating_after"] for r in rs) / len(rs))
             if vals:
                 lines.append(f"{g:<10} {len(vals):>5} {sum(vals) / len(vals):>18.1f}")
+    lines += size_table(pilots, rounds)
     return "\n".join(lines)
+
+
+def size_table(pilots, rounds) -> list[str]:
+    """Do bigger mushroom bodies learn faster or go lower?  Per brain size: flies, how many reached loss < 12 and
+    after how many training blocks, the best and the recent check loss, and the loss on unseen conditions."""
+    size_of = {(p["league"], p["pid"]): (p.get("genome") or {}).get("n_kc", 600) for p in pilots}
+    series: dict = {}
+    for r in sorted(rounds, key=lambda r: (r["league"], r["gp"])):
+        ev = (r.get("train") or {}).get("eval")
+        if ev and not r.get("legend"):
+            series.setdefault((r["league"], r["pid"]), []).append(ev)
+    rows = {}
+    for key, evs in series.items():
+        n = size_of.get(key, 600)
+        losses = [e["loss"] for e in evs]
+        reach = next((i + 1 for i, v in enumerate(losses) if v < 12), None)
+        gs = [e["gauntlet"] for e in evs[-10:] if e.get("gauntlet") is not None]
+        rows.setdefault(n, []).append({"best": min(losses), "recent": sum(losses[-10:]) / len(losses[-10:]), "reach": reach,
+                                       "gaunt": sum(gs) / len(gs) if gs else None, "blocks": len(losses)})
+    if len(rows) < 1:
+        return []
+    out = ["", f"{'cells':>6} {'flies':>5} {'reached<12':>11} {'median blocks':>14} {'best loss':>10} {'recent loss':>12} {'unseen loss':>12}"]
+    avg = lambda xs: f"{sum(xs) / len(xs):.2f}" if xs else "-"
+    for n in sorted(rows):
+        rs = rows[n]
+        reached = sorted(r["reach"] for r in rs if r["reach"])
+        med = reached[len(reached) // 2] if reached else "-"
+        out.append(f"{n:>6} {len(rs):>5} {len(reached):>5}/{len(rs):<5} {str(med):>14} {avg([r['best'] for r in rs]):>10} "
+                   f"{avg([r['recent'] for r in rs]):>12} {avg([r['gaunt'] for r in rs if r['gaunt'] is not None]):>12}")
+    return out
 
 
 def main():
