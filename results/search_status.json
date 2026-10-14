@@ -1,6 +1,6 @@
 {
   "rounds_run": 91,
   "champion_crashes": 0,
-  "champion_total_time": 56.36159999999924,
-  "champion_run": "models/flypilot_brain.pkl (pre-existing)"
+  "champion_total_time": 56.305199999999246,
+  "champion_run": "league: Mitch Penrose (GP 453, 300 episodes)"
 }

@@ -5,8 +5,8 @@
       "finished": 150,
       "crashes": 0,
       "timeouts": 0,
-      "avg_time": 10.199999999999871,
-      "best_time": 10.179999999999872
+      "avg_time": 10.019999999999875,
+      "best_time": 10.019999999999875
     },
     "baseline": {
       "n": 150,
@@ -41,8 +41,8 @@
       "finished": 150,
       "crashes": 0,
       "timeouts": 0,
-      "avg_time": 13.039466666666478,
-      "best_time": 13.019999999999811
+      "avg_time": 12.819999999999816,
+      "best_time": 12.819999999999816
     },
     "baseline": {
       "n": 150,
@@ -59,8 +59,8 @@
       "finished": 150,
       "crashes": 0,
       "timeouts": 0,
-      "avg_time": 10.309333333333202,
-      "best_time": 10.119999999999873
+      "avg_time": 10.4581333333332,
+      "best_time": 10.179999999999872
     },
     "baseline": {
       "n": 150,
@@ -77,8 +77,8 @@
       "finished": 150,
       "crashes": 0,
       "timeouts": 0,
-      "avg_time": 12.65279999999982,
-      "best_time": 12.359999999999825
+      "avg_time": 12.847066666666482,
+      "best_time": 12.459999999999823
     },
     "baseline": {
       "n": 150,
