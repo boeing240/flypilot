@@ -6,7 +6,8 @@ import * as THREE from "./vendor/three.module.min.js";
 const LANE_W = 3.0, CW = 1316, CH = 560;
 let renderer = null, scene = null, camera = null, cars = [], field = null, shared = null, smoke = null, trackGroup = null, failed = false;
 const look = new THREE.Vector3(), camGoal = new THREE.Vector3(), lookGoal = new THREE.Vector3();
-const cam = { shot: "", since: 0, init: false };
+const fwdOld = new THREE.Vector3(), fwdNew = new THREE.Vector3(), aP = new THREE.Vector3(), aW = new THREE.Vector3(), offP = new THREE.Vector3(), offT = new THREE.Vector3(), gP = new THREE.Vector3(), gT = new THREE.Vector3();
+const cam = { shot: "", clock: 0, cutAt: -9, init: false, fade: null, exposure: 1 };
 const clamp01 = (x) => Math.max(0, Math.min(1, x));
 
 function canvasTex(w, h, draw, repeat) {
@@ -255,32 +256,64 @@ function setField(key, list, n, L) {
   cars = list.map((c) => { const obj = buildCar(c); scene.add(obj); return { obj, lane: c.lane, number: c.number }; });
   buildTrack(n, L);
   field = { key, n, L, W: n * LANE_W };
-  cam.init = false;
+  cam.init = false; cam.pack = null; cam.clock = 0; cam.cutAt = -9; cam.fade = null; cam.exposure = 1;
 }
 
 /* ------------------------------------------------------------------ camera director */
 function director(st, dt, pack, winner) {
   const { L, W } = field, t = st.simT - st.tGreen, xl = pack.x, zc = pack.z, sp = pack.spread;
-  let shot, P = camGoal, T = lookGoal;
+  let shot, P = camGoal, T = lookGoal, anchor = null;
   if (st.simT < st.tGreen + 0.2) {                                              // grid: slow push-in from behind and above
     shot = "grid"; P.set(-15 + Math.min(st.simT, 8) * 0.5, 6.5, 2); T.set(14, 1.1, 0);
   } else if (st.tWin !== null && st.simT >= st.tWin && winner) {                // the winner: a slow orbit
-    shot = "winner"; const a = 0.9 + (st.simT - st.tWin) * 0.55;
-    P.set(winner.x - 2 + Math.cos(a) * 6.5, 2.3, winner.z + Math.sin(a) * 6.5); T.set(winner.x, 1.45, winner.z);
-  } else if (xl > L - 42) {                                                      // finish line, facing the fly faces
-    shot = "finish"; P.set(L + 3.0, 1.9, THREE.MathUtils.clamp(zc * 0.8, -W * 0.3, W * 0.3)); T.set(L - 14, 1.3, zc * 0.6);
-  } else if (t < 2.4) {                                                          // launch: a broadcast angle from the side
-    shot = "launch"; P.set(xl - 4, 5.5, -W / 2 - 6); T.set(xl + 4, 0.9, -W * 0.1);
+    shot = "winner"; const a = 0.9 + (st.simT - st.tWin) * 0.4;
+    P.set(winner.x - 2 + Math.cos(a) * 8, 3.5, winner.z + Math.sin(a) * 8); T.set(winner.x, 1.3, winner.z);
+    anchor = aW.set(winner.x, 0, winner.z);
+  } else if (xl > L - 55) {                                                      // finish line, facing the fly faces
+    shot = "finish"; P.set(L + 3.0, 3.4, THREE.MathUtils.clamp(zc * 0.8, -W * 0.3, W * 0.3)); T.set(L - 14, 1.1, zc * 0.6);   // high enough that the cars pass underneath
   } else {
-    const idx = Math.floor((t - 2.4) / 1.9) % 3;                                // three shots in rotation, a couple of seconds each
+    // long shots, few cuts: above and behind the pack (looking the way they drive) for ~4 s, then facing them for ~5 s
+    // (the one turn-around of the race), then beside them; a longer race keeps cycling
+    anchor = aP.set(xl, 0, zc);
+    const u = Math.max(0, t - 0.2) % 12.2, idx = u < 3.8 ? 1 : u < 8.6 ? 0 : 2;
     shot = ["hero", "chase", "side"][idx];
     if (idx === 0) { P.set(xl + 9 + sp * 0.4, 2.1 + sp * 0.05, zc + 3.5 + sp * 0.25); T.set(xl - 1, 1.25, zc); }            // ahead of the leaders, looking back at the faces
     else if (idx === 1) { P.set(xl - 6.5 - sp * 0.5, 2.9 + sp * 0.12, zc); T.set(xl + 6, 1.0, zc); }                         // above and behind: the wings from the top
-    else { P.set(xl + 3, 4.2, -W / 2 - 8.5); T.set(xl - 1, 1.1, zc); }                                              // beside the pack, above the wall
+    else { P.set(xl + 3, 4.2, -W / 2 - 8.5); T.set(xl - 1, 1.1, zc); }                                                        // beside the pack, above the wall
   }
-  const k = cam.init ? 1 - Math.exp(-dt * (shot === cam.shot ? 3.2 : 2.0)) : 1;
-  camera.position.lerp(P, k); look.lerp(T, k); camera.lookAt(look);
-  cam.shot = shot; cam.init = true;
+  // A cut that would swing the view through a big angle (e.g. from looking ahead to looking back) is a dip to black,
+  // never a whip pan; smaller changes are a slow swing in an arc over the cars.
+  if (shot !== cam.shot && cam.init && !cam.fade) {
+    fwdOld.subVectors(look, camera.position).normalize(); fwdNew.subVectors(T, P).normalize();
+    if (fwdOld.dot(fwdNew) < 0.45 || camera.position.distanceTo(P) > 90) cam.fade = { t: 0, snapped: false };
+    else cam.cutAt = cam.clock;
+  } else if (shot !== cam.shot) cam.cutAt = cam.clock;
+  cam.clock += dt;
+  if (cam.fade) {
+    cam.fade.t += dt;
+    const f = cam.fade.t;
+    cam.exposure = f < 0.2 ? 1 - f / 0.2 : Math.min(1, (f - 0.2) / 0.3);
+    if (f >= 0.2 && !cam.fade.snapped) { cam.fade.snapped = true; cam.init = false; cam.cutAt = -9; }      // jump while it is dark
+    if (f >= 0.5) { cam.fade = null; cam.exposure = 1; }
+  }
+  const since = cam.clock - (cam.cutAt ?? -9), arc = since < 1.8 ? 3.2 * Math.sin(clamp01(since / 1.8) * Math.PI) : 0;
+  const k = cam.init ? 1 - Math.exp(-dt * (since < 1.8 ? 1.5 : 3.0)) : 1;
+  P.y += arc;
+  if (cam.fade && !cam.fade.snapped) {                                          // fading to black: hold the old view until it is dark
+    camera.lookAt(look); cam.shot = shot; renderer.toneMappingExposure = 1.05 * cam.exposure; return;
+  }
+  if (anchor) {
+    // follow the pack rigidly: smooth the camera's position *relative* to it, otherwise the lag (about 10 m at racing speed)
+    // lets the cars rush past the lens and whips the view around
+    if (cam.anchor !== anchor || !cam.init) { offP.copy(camera.position).sub(anchor); offT.copy(look).sub(anchor); }
+    offP.lerp(gP.copy(P).sub(anchor), k); offT.lerp(gT.copy(T).sub(anchor), k * (since < 1.8 ? 0.9 : 1));
+    camera.position.copy(anchor).add(offP); look.copy(anchor).add(offT);
+  } else {
+    camera.position.lerp(P, k); look.lerp(T, k * (since < 1.8 ? 0.9 : 1));
+  }
+  camera.lookAt(look);
+  cam.anchor = anchor; cam.shot = shot; cam.init = true;
+  renderer.toneMappingExposure = 1.05 * (cam.exposure ?? 1);
 }
 
 /* ------------------------------------------------------------------ one frame */
@@ -319,13 +352,19 @@ function render(st) {
   const lights = trackGroup && trackGroup.userData.lights;
   if (lights) lights.forEach((m, i) => { const green = st.simT >= st.tGreen; const on = i === 3 ? green : !green && !st.anim; m.color.set(on ? (i === 3 ? 0x35e07a : 0xffb020) : 0x1d2739); });
   const front = cars.filter((c) => c.x !== undefined).sort((a, b) => b.x - a.x).slice(0, 3);
-  const zs = front.map((c) => c.z), pack = front.length ? { x: front[0].x, z: zs.reduce((a, b) => a + b, 0) / zs.length, spread: Math.max(...zs) - Math.min(...zs) } : { x: 0, z: 0, spread: 0 };
+  const zs = front.map((c) => c.z), raw = front.length ? { x: front[0].x, z: zs.reduce((a, b) => a + b, 0) / zs.length, spread: Math.max(...zs) - Math.min(...zs) } : { x: 0, z: 0, spread: 0 };
+  const f = cam.pack ? 1 - Math.exp(-dt * 2.2) : 1;                           // ~0.45 s time constant for the sideways drift
+  cam.pack = cam.pack || { ...raw };
+  cam.pack.x = raw.x; cam.pack.z += (raw.z - cam.pack.z) * f; cam.pack.spread += (raw.spread - cam.pack.spread) * f;
+  const pack = cam.pack;
   director(st, dt, pack, winner);
+  if (cam.exposure < 0.6) for (const l of labels) l.front = false;                 // no name tags floating over a black screen
   stepSmoke(dt);
   renderer.render(scene, camera);
   return labels;
 }
 
 window.View3D = { init, setField, render, get ready() { return !!renderer; }, get failed() { return failed; },
+  exposure: () => cam.exposure,
   debug: () => ({ cam: camera.position.toArray().map((v) => +v.toFixed(1)), look: look.toArray().map((v) => +v.toFixed(1)), shot: cam.shot, cars: cars.map((c) => [+(c.x ?? 0).toFixed(1), +(c.z ?? 0).toFixed(1)]) }) };
 window.dispatchEvent(new Event("view3d-loaded"));
