@@ -154,3 +154,14 @@ Run from the repo root (not inside `flypilot/`) so the `flypilot.*` module
 imports resolve. Promote a run's `best.pkl` by copying it to
 `models/flypilot_brain.pkl` and rerunning `evaluate_scenarios` with its
 default paths.
+
+### 3D view
+
+Switch on *3D view of the race* in the admin panel (group Broadcast; takes effect at once) to watch the same
+recorded runs as a 3D scene: every car has its fly at the wheel (faceted red eyes, helmet in its colours, wings
+beating faster with speed, hands turning the wheel; the Legend wears a crown), and an automatic camera director
+cuts between the grid, the launch, a shot facing the pack, a shot from above and behind, one beside the strip,
+the finish line, and an orbit around the winner. Name tags, clock, lights and all panels stay as in 2D.
+`?3d=1` on the page's address forces it on (handy for OBS). It uses WebGL (three.js r160 in `web/vendor/`) and falls
+back to the 2D strips if the browser has none.
+

@@ -80,6 +80,7 @@
   /* ---------- track ---------- */
   #trackp { left: 580px; top: 100px; width: 1316px; height: 560px; background: #0e1522; }
   #track { position: absolute; left: 0; top: 0; width: 1316px; height: 560px; }
+  #gl3d { position: absolute; left: 0; top: 0; width: 1316px; height: 560px; display: none; }
   #card {
     position: absolute; left: 0; right: 0; top: 150px; margin: auto; width: 760px; text-align: center; padding: 26px 30px 24px;
     background: rgba(8,12,20,.86); border: 1px solid #2b3d5c; border-radius: 16px; opacity: 0; transform: scale(.96);
@@ -246,6 +247,7 @@
   </section>
 
   <section id="trackp" class="panel">
+    <canvas id="gl3d"></canvas>
     <canvas id="track"></canvas>
     <div id="card"><div class="k" id="card-k"></div><div class="t" id="card-t"></div><div class="chips" id="card-chips"></div></div>
     <div id="banner"><span id="banner-face"></span><div><div class="k">WINNER</div><div class="v" id="banner-v"></div></div></div>
@@ -277,6 +279,7 @@
   <div id="wait"><div id="wait-main">Waiting for the first Grand Prix</div><small id="wait-sub">pilots are warming up their brains&hellip;</small></div>
 </div>
 
+<script type="module" src="view3d.js"></script>
 <script>
 "use strict";
 /* ============================================================ helpers */
@@ -295,7 +298,7 @@ const surname = (n) => n.split(" ").slice(1).join(" ") || n;
 const frame = () => new Promise((r) => requestAnimationFrame(r));
 
 // Broadcast timing comes from the admin panel (live.json); these are the fallbacks.
-const BC_DEFAULT = { intro_s: 4.5, staging_s: 2, podium_s: 8, intermission_s: 8, fast_forward: 4, animations: true, idle_replays: false, lead_rounds: 2 };
+const BC_DEFAULT = { intro_s: 4.5, staging_s: 2, podium_s: 8, intermission_s: 8, fast_forward: 4, animations: true, idle_replays: false, lead_rounds: 2, view3d: false };
 const G = { state: null, live: null, meta: {}, races: new Map(), queue: [], lastGp: -1, rankLocked: false, rows: new Map(),
             lastReplay: null, shownGp: 0, hbGp: 0, everPlayed: false, initialReplay: true, records: {} };
 const bc = () => ({ ...BC_DEFAULT, ...((G.live && G.live.broadcast) || {}) });
@@ -833,6 +836,9 @@ function drawCar(g, x, cy, w, color, num, angle, alpha, legend, t, v) {
 // anim = { p } during the round intro (p: 0..1 of the intro): lane tags slide in, then the cars roll onto the grid
 function drawFrame(simT, anim) {
   const { n, laneH, entries, dt, tGreen, L } = R, k = simT / dt, g = tg;
+  const g3 = use3D();
+  if (g3) { g.clearRect(0, 0, CW, CH); draw3D(simT, anim); }
+  else {
   g.drawImage(R.bg, 0, 0, CW, CH);
   // lane tags
   for (const e of entries) {
@@ -872,6 +878,7 @@ function drawFrame(simT, anim) {
       else { g.fillStyle = st === "crash" ? "#ff6b6b" : "#8497b5"; g.fillText(st === "crash" ? "CRASH" : "DNF", XEND + 16, e.cy + 5); }
     }
   }
+  }
   // staging lights
   const green = simT >= tGreen, lx = X0 + 24, ly = 30;
   g.textAlign = "left"; g.font = `700 12px ${FONT}`; g.fillStyle = "#8497b5"; g.fillText(green ? "GO" : "STAGED", lx - 2, ly - 16);
@@ -886,6 +893,44 @@ function drawFrame(simT, anim) {
   g.fillText(shown.toFixed(2), CW - 56, 42); g.font = `600 16px ${FONT}`; g.fillStyle = "#8497b5"; g.fillText("s", CW - 30, 42);
   if (R.ffStart <= simT && simT < R.tEnd && R.ff > 1) { g.font = `700 13px ${FONT}`; g.fillStyle = "#8497b5"; g.fillText(`▶▶ ${R.ff}x`, CW - 190, 40); }
   if (!R.bannerShown && R.tWin !== null && simT >= R.tWin) { R.bannerShown = true; showBanner(); }
+}
+
+/* ============================================================ the 3D view (view3d.js): same recorded runs, a fly at every wheel */
+const FORCE_3D = new URLSearchParams(location.search).get("3d") === "1";
+function use3D() {
+  const V = window.View3D, cv = $("#gl3d"), want = FORCE_3D || bc().view3d;
+  if (!want || !V || V.failed) { if (cv.style.display !== "none") cv.style.display = "none"; return false; }
+  if (!V.ready && !V.init(cv)) return false;
+  if (cv.style.display !== "block") cv.style.display = "block";
+  return true;
+}
+function carState(e, simT, k) {
+  const t = e.trace, s = sample(e, k), i = e.cur, done = simT >= e.tEnd, status = e.result.status;
+  const at = (arr, fallback) => (arr ? arr[Math.min(i, arr.length - 1)] : fallback);
+  const th = at(t.th, 0), st = at(t.st, 0), sh = at(t.sh, 0);
+  if (done && !e.pbShown) { e.pbShown = true; if (R.live) revealPb(e.pid); }          // a personal best shows the moment the fly crosses the line
+  const a = sample(e, k - 3), b = sample(e, k + 3); sample(e, k);                      // heading from the path a moment ago and ahead
+  const cls = R.cls.get(e.pid);
+  return { lane: e.lane, x: s.x, y: s.y, v: s.v, g: s.g, s: s.s, th, st, sh, yaw: Math.atan2(b.y - a.y, Math.max(b.x - a.x, 0.5)),
+           done, status, since: Math.max(0, simT - e.tEnd), vEnd: t.v[t.v.length - 1] || 0, pos: status === "finished" && cls ? cls.pos : 0 };
+}
+let last3d = 0;
+function draw3D(simT, anim) {
+  const V = window.View3D, g = tg, k = simT / R.dt, now = performance.now(), dt = last3d ? (now - last3d) / 1000 : 0.016; last3d = now;
+  if (R.key3d !== R.race.id) {
+    V.setField(R.race.id, R.entries.map((e) => ({ lane: e.lane, color: e.m.color, legend: !!e.m.legend, number: e.m.number, name: e.m.name })), R.n, R.L);
+    R.key3d = R.race.id;
+  }
+  const cars = R.entries.map((e) => carState(e, simT, k));
+  const labels = V.render({ simT, dt, tGreen: R.tGreen, tWin: R.tWin, anim, cars });
+  g.textAlign = "center"; g.lineJoin = "round";
+  labels.forEach((l, i) => {                                            // name tags float above the flies
+    if (!l.front || l.d > 150) return;
+    const e = R.entries[i], c = cars[i], size = Math.max(9, Math.min(15, 17 - l.d * 0.1));
+    const text = c.done ? (c.status === "finished" ? `P${c.pos}  ${fmtT(R.cls.get(e.pid).time)}` : c.status === "crash" ? "CRASH" : "DNF") : surname(e.m.name);
+    g.font = `700 ${size}px ${FONT}`; g.lineWidth = 4; g.strokeStyle = "rgba(8,12,20,.92)"; g.strokeText(text, l.sx, l.sy);
+    g.fillStyle = c.done ? (c.status === "finished" ? (c.pos === 1 ? "#ffd700" : "#e8eef9") : "#ff6b6b") : e.m.legend ? "#ffd700" : "#ffffff"; g.fillText(text, l.sx, l.sy);
+  });
 }
 
 let timingAt = 0;

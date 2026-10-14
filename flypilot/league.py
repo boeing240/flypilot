@@ -189,12 +189,15 @@ SETTINGS_SPEC = [
          apply="live", help="Speed-up once the winner is home and only stragglers remain."),
     dict(key="animations", group="Broadcast", label="Round start/end animations", type="bool", default=True,
          apply="live", help="Flag wipe, podium and confetti."),
+    dict(key="view3d", group="Broadcast", label="3D view of the race", type="bool", default=False, apply="live",
+         help="Show the races as a 3D scene (flies at the wheel, moving camera) instead of the top-down strips. "
+              "Needs WebGL; falls back to 2D if the browser has none."),
     dict(key="idle_replays", group="Broadcast", label="Replay while waiting", type="bool", default=False,
          apply="live", help="If the next round isn't ready, replay an old one instead of showing the training screen."),
 ]
 SPEC_BY_KEY = {s["key"]: s for s in SETTINGS_SPEC}
 DEFAULTS = {s["key"]: s["default"] for s in SETTINGS_SPEC}
-BROADCAST_KEYS = ("intro_s", "staging_s", "podium_s", "intermission_s", "fast_forward", "animations", "idle_replays")
+BROADCAST_KEYS = ("intro_s", "staging_s", "podium_s", "intermission_s", "fast_forward", "animations", "idle_replays", "view3d")
 
 
 def clean_settings(raw: dict, base: dict) -> dict:
