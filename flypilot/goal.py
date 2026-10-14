@@ -17,6 +17,7 @@ champions and reset leagues all go to stream_data/archive/.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import pathlib
@@ -111,11 +112,23 @@ class Goal:
             self.hof: list[dict] = json.loads(HOF_PATH.read_text())
         except (OSError, ValueError):
             self.hof = []
+        self.sigs: set[str] = {h["sig"] for h in self.hof if h.get("sig")}
+        # brains verified before fingerprints existed (their files are kept) and the reigning champion itself
+        for f in list(CANDIDATES.glob("*.pkl")) + [MODEL_PATH]:
+            try:
+                self.sigs.add(self.known(pickle.loads(f.read_bytes())))
+            except Exception:
+                pass
 
     def _save(self):
         write_json(HOF_PATH, self.hof)
 
     # -- choosing and queueing contenders
+    def known(self, brain) -> str:
+        """Fingerprint of what a frozen policy depends on. A fly whose training blocks keep being rejected keeps the very
+        same brain, and verifying it again would only repeat the same 750 episodes."""
+        return hashlib.sha1(brain.W.tobytes()).hexdigest()[:20]
+
     def consider(self, pool, gp: int, scenario: str, order: list[str], pilots: dict, raced: dict) -> list[str]:
         """After a race: queue the best contender, if there is one. Returns the pids queued."""
         c = self.cfg()
@@ -132,16 +145,21 @@ class Goal:
                 continue
             if any(h["pid"] == pid and h["status"] == "pending" for h in self.hof):
                 continue
+            if self.known(p["brain"]) in self.sigs:                           # this exact brain has been verified already
+                p["last_verify_eps"] = p["episodes"]
+                continue
             found.append((r["time"] - ref, pid))
         queued = []
         for delta, pid in sorted(found)[:1]:
             p = pilots[pid]
             blob = pickle.dumps(p["brain"])
+            sig = self.known(p["brain"])
+            self.sigs.add(sig)
             hid = f"gp{gp:04d}_{pid}"
             write_bytes(CANDIDATES / f"{hid}.pkl", blob)
             self.hof.append({"id": hid, "pid": pid, "name": p["name"], "nation": p["nation"], "gp": gp,
                              "episodes": p["episodes"], "scenario": scenario, "race_delta": round(delta, 3),
-                             "status": "pending", "ts": time.time()})
+                             "status": "pending", "ts": time.time(), "sig": sig})
             self._save()
             p["last_verify_eps"] = p["episodes"]
             self._submit(pool, hid, blob)
