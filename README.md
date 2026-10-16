@@ -100,6 +100,16 @@ compares them for real: `python -m flypilot.analysis` ends with a table per size
 under 12, after how many blocks, best/recent loss, and loss on *unseen conditions* -- grip, engine and
 surface roughness outside the training ranges, tested after every round).
 
+Three things keep the search from stalling once the flies reach the Legend's level (all in the admin panel, group *Evolution*):
+* **New wiring.** Most random newcomers get a different brain structure -- 5-20% of the cells active (instead of 10%), 4-8
+  inputs per cell (instead of 6), 15-35% steering cells (instead of 25%) -- and `python -m flypilot.analysis` ends with a table
+  per structure, so it shows which wiring wins.
+* **Families.** Every fly knows its founder. Parents are the best flies of *different* families, and a family above
+  *Max flies per family* loses its weakest member first, so one lineage cannot fill the field with its clones.
+* **Elite check.** The best few flies are re-tested on a larger fixed set (6 episodes per scenario, rotated every 50 rounds, re-run
+  only when the brain changes). The per-round check has a spread of about 0.03, the same size as the differences between
+  elite flies; parents and retirees are chosen with the cleaner number.
+
 Everything needed to analyse a run later is appended to `stream_data/analysis/*.jsonl` (survives
 resets): `leagues` (full settings at start and every change), `pilots` (origin, parent, generation,
 seed, genome on join; final stats on exit), `rounds` (one line per fly per race: placing, time,

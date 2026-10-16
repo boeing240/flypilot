@@ -663,7 +663,7 @@ function drawBrain(simT, leaderE) {
     g.beginPath(); g.arc(cx, cy, a > 0.25 ? radOn : rad, 0, 7); g.fill();
   }
   g.fillStyle = "#8497b5"; g.font = `600 10.5px ${FONT}`; g.textAlign = "center";
-  g.fillText(`${NK} Kenyon cells \u00b7 about 10% fire on any tick`, x0 + 120, 18);
+  g.fillText(`${NK} Kenyon cells \u00b7 about ${Math.round(100 * (kc.sp || 0.1))}% fire on any tick`, x0 + 120, 18);
   g.fillStyle = "rgba(255,215,0,.9)"; g.fillText("\u25cf speed & gear cells", x0 + 62, H - 8);
   g.fillStyle = "rgba(61,220,151,.95)"; g.fillText("\u25cf steering cells", x0 + 178, H - 8);
   // --- what the five output neurons said

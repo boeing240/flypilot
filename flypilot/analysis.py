@@ -116,6 +116,7 @@ def summary() -> str:
             if vals:
                 lines.append(f"{g:<10} {len(vals):>5} {sum(vals) / len(vals):>18.1f}")
     lines += size_table(pilots, rounds)
+    lines += structure_table(pilots, rounds)
     return "\n".join(lines)
 
 
@@ -146,6 +147,31 @@ def size_table(pilots, rounds) -> list[str]:
         med = reached[len(reached) // 2] if reached else "-"
         out.append(f"{n:>6} {len(rs):>5} {len(reached):>5}/{len(rs):<5} {str(med):>14} {avg([r['best'] for r in rs]):>10} "
                    f"{avg([r['recent'] for r in rs]):>12} {avg([r['gaunt'] for r in rs if r['gaunt'] is not None]):>12}")
+    return out
+
+
+def structure_table(pilots, rounds) -> list[str]:
+    """Which wiring wins?  Flies grouped by the share of active cells and by inputs per cell."""
+    info = {(p["league"], p["pid"]): p.get("genome") or {} for p in pilots}
+    best: dict = {}
+    for r in rounds:
+        ev = (r.get("train") or {}).get("eval")
+        if ev and not r.get("legend"):
+            key = (r["league"], r["pid"])
+            best[key] = min(best.get(key, 99.0), ev["loss"])
+    out = []
+    for title, keyf in (("active cells", lambda g: f"{round(g.get('sparsity', 0.1) * 100):>3d}%"), ("inputs per cell", lambda g: f"{g.get('n_claws', 6):>4d}"),
+                        ("steering cells", lambda g: f"{round(g.get('lat_kc_fraction', 0.25) * 100):>3d}%")):
+        groups: dict = {}
+        for key, loss in best.items():
+            g = info.get(key, {})
+            if "sparsity" in g:
+                groups.setdefault(keyf(g), []).append(loss)
+        if len(groups) > 1:
+            out += ["", f"{title:>16} {'flies':>6} {'reached<12':>11} {'best loss':>10} {'median best':>12}"]
+            for k in sorted(groups):
+                v = sorted(groups[k])
+                out.append(f"{k:>16} {len(v):>6} {sum(1 for x in v if x < 12):>5}/{len(v):<5} {v[0]:>10.2f} {v[len(v) // 2]:>12.2f}")
     return out
 
 

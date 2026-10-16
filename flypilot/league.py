@@ -140,6 +140,16 @@ SETTINGS_SPEC = [
     dict(key="gauntlet_episodes", group="Evolution", label="Unseen-condition check (episodes)", type="int", min=0, max=24, default=8,
          apply="round", help="After each round every fly is also tested on this many episodes in conditions it never trained on "
                              "(wider grip/engine/surface ranges). Logged and shown in Progress. 0 = off."),
+    dict(key="structure_share", group="Evolution", label="Newcomers with a new structure", type="float", min=0, max=1, step=0.05,
+         default=0.7, apply="round", help="Share of random newcomers whose brain wiring differs: 5-20% of the cells active, "
+                                           "4-8 inputs per cell, 15-35% steering cells. The rest keep the standard 10% / 6 / 25%."),
+    dict(key="family_cap", group="Evolution", label="Max flies per family", type="int", min=0, max=6, default=2, apply="round",
+         help="Flies descended from the same founder. Above this the family's weakest member retires first, and parents are "
+              "taken from different families, so one lineage cannot fill the field with its clones. 0 = no limit."),
+    dict(key="elite_check", group="Evolution", label="Elite check (episodes per scenario)", type="int", min=0, max=12, default=6,
+         apply="round", help="The best flies are re-tested on a larger fixed set of episodes (re-run only when the brain changes), "
+                             "so a difference of 0.02 s is not just noise. Used to pick parents and retirees. 0 = off."),
+    dict(key="elite_count", group="Evolution", label="Flies in the elite check", type="int", min=1, max=8, default=4, apply="round"),
     dict(key="eval_per_scenario", group="Evolution", label="Check episodes per scenario", type="int", min=0, max=6, default=2,
          apply="round", help="After each training block a fly is tested on this many frozen episodes in each of the five scenarios; "
                              "the block is kept only if the fly did not get worse. 0 = no check (blocks always kept)."),
@@ -263,7 +273,7 @@ def record_race(brain: FlyBrain, scenario: str, seed: int) -> dict:
             "th": [round(r[8], 2) for r in kept],
             "st": [round(r[9], 2) for r in kept],
             "sh": [int(r[10]) for r in kept],
-            "kc": {"k": kc_k, "i": kc_idx, "p": kc_pool, "n": int(brain.n_kc), "lat": int(brain.kc_group.sum())},
+            "kc": {"k": kc_k, "i": kc_idx, "p": kc_pool, "n": int(brain.n_kc), "lat": int(brain.kc_group.sum()), "sp": float(brain.sparsity)},
         },
         "result": {
             "status": status,
@@ -616,7 +626,7 @@ class League:
         ident = make_identity(seed, names, numbers, colors)
         parent = None
         if breed and self.cfg["evolve"] and self.rng.random() >= self.cfg["immigrant_share"]:
-            parent = choose_parent(self.trained(), self.pilots.get("legend"), self.rng, self.cfg["legend_parent_share"])
+            parent = choose_parent(self.trained(), self.pilots.get("legend"), self.rng, self.cfg["legend_parent_share"], score=self.score)
         mutation = None
         if parent is not None:
             brain, mutation = mutate_brain(parent["brain"], seed, self.cfg["mutation_rate"])
@@ -624,11 +634,15 @@ class League:
             rr = random.Random(seed)
             u = random.Random(seed ^ 0x5EED).random()                       # brain size: 2400 / 1200 / else 600 Kenyon cells
             n_kc = 2400 if u < self.cfg["big_brain_2400"] else 1200 if u < self.cfg["big_brain_2400"] + self.cfg["big_brain_1200"] else 600
-            brain = FlyBrain(n_pn=N_PN, n_kc=n_kc, seed=seed, noise_sigma=round(rr.uniform(0.3, 0.9), 3),
-                             eta=round(rr.uniform(0.01, 0.04), 4), lat_kc_fraction=0.25)
+            sr = random.Random(seed ^ 0xC1A5)                                # wiring: how many cells fire, inputs per cell, steering cells
+            vary = sr.random() < self.cfg["structure_share"]
+            sparsity, claws, lat = (round(sr.uniform(0.05, 0.20), 3), sr.choice([4, 5, 6, 7, 8]), round(sr.uniform(0.15, 0.35), 2)) if vary else (0.10, 6, 0.25)
+            brain = FlyBrain(n_pn=N_PN, n_kc=n_kc, n_claws=claws, sparsity=sparsity, seed=seed, noise_sigma=round(rr.uniform(0.3, 0.9), 3),
+                             eta=round(rr.uniform(0.01, 0.04), 4), lat_kc_fraction=lat)
         pilot = self._new_pilot(pid, ident, brain, seed)
         if parent is not None:
             pilot.update(gen=parent.get("gen", 0) + 1, parent=parent["name"], parent_pid=parent["id"], origin="offspring",
+                         family=parent.get("family", parent["id"]),
                          lineage=(parent.get("lineage", []) + [parent["name"]])[-6:],
                          dl=copy.deepcopy(parent["dl"]), dt=copy.deepcopy(parent["dt"]))
         elif breed:
@@ -656,7 +670,7 @@ class League:
         self.note_gen(p, joined=True)
         analysis.append("pilots", {
             "event": "join", "league": self.league_seed, "pid": p["id"], "name": p["name"], "nation": p["nation"],
-            "number": p["number"], "legend": bool(p["legend"]), "gp": self.gp, "origin": p.get("origin"),
+            "number": p["number"], "legend": bool(p["legend"]), "gp": self.gp, "origin": p.get("origin"), "family": p.get("family", p["id"]),
             "gen": p.get("gen", 0), "parent": p.get("parent"), "parent_pid": p.get("parent_pid"), "seed": p["seed"],
             "rating_start": p["rating"], "genome": genome(p["brain"]), "mutation": mutation,
             "training": {k: self.cfg[k] for k in ("stage_episodes", "randomize_prob", "nominal_share", "mutation_rate",
@@ -670,6 +684,48 @@ class League:
             return None
         return {"k": self.cfg["candidates"], "scale": self.cfg["careful_scale"], "eps": self.cfg["careful_episodes"],
                 "min_gain": self.cfg["min_gain"]}
+
+    def hi_valid(self, p: dict) -> bool:
+        return p.get("fit_hi") is not None and p.get("hi_key") == (p.get("sig"), self.gp // 50)
+
+    def score(self, p: dict) -> float:
+        """How good a fly is, lower = better. The elite check (large fixed set, same episodes for a given brain) beats the
+        per-round check (10 episodes, sd ~0.03); a fly without a fresh elite check is judged a bit more harshly because
+        the best of many noisy numbers is optimistic."""
+        if self.hi_valid(p):
+            return p["fit_hi"]
+        return p["fit"] + 0.08 if p.get("fit") is not None else 99.0
+
+    def elite_check(self, pool, gp: int) -> None:
+        """Re-test the best few flies on a bigger fixed set; a brain that has not changed is not tested again."""
+        per, k = self.cfg["elite_check"], self.cfg["elite_count"]
+        if per <= 0:
+            return
+        epoch, seed = gp // 50, 777_000 + 31 * (gp // 50)                   # the set rotates every 50 rounds, so nobody can overfit it
+        flies = sorted((p for p in self.trained() if p.get("fit") is not None), key=lambda p: p["fit"])[:k]
+        futs = {}
+        for p in flies:
+            if p.get("hi_key") == (p["sig"], epoch):
+                continue
+            futs[pool.submit(_eval_task, p["brain"], per, seed, 0)] = (p, (p["sig"], epoch))
+        waiting = set(futs)
+        while waiting:
+            if self.abort_req:
+                raise Aborted()
+            done, waiting = wait(waiting, timeout=0.25, return_when=FIRST_COMPLETED)
+            for fut in done:
+                p, key = futs[fut]
+                p["fit_hi"], p["hi_key"] = fut.result()["loss"], key
+
+    def pick_retiree(self, eligible: list[dict]) -> dict:
+        """The weakest fly -- but a family above the cap loses its weakest member first."""
+        cap = self.cfg["family_cap"]
+        if cap > 0:
+            fam = collections.Counter(p.get("family", p["id"]) for p in self.trained())
+            over = [p for p in eligible if fam[p.get("family", p["id"])] > cap]
+            if over:
+                return max(over, key=lambda p: (self.score(p), -p["rating"]))
+        return max(eligible, key=lambda p: (self.score(p), -p["rating"]))
 
     def train_scale_for(self, p: dict) -> float:
         """An untrained fly learns at full strength; the better it gets, the gentler (down to `train_scale`)."""
@@ -695,6 +751,7 @@ class League:
             analysis.append("rounds", {
                 "league": self.league_seed, "gp": gp, "season": season, "scenario": scenario, "pid": pid, "name": p["name"],
                 "legend": bool(p["legend"]), "gen": p.get("gen", 0), "origin": p.get("origin"), "n_kc": int(p["brain"].n_kc),
+                "family": p.get("family", p["id"]), "fit_hi": round(p["fit_hi"], 3) if self.hi_valid(p) else None,
                 "pos": pos, "of": len(order),
                 "status": r["status"], "time": round(r["time"], 3) if r["status"] == "finished" else None,
                 "x": round(r["x"], 1), "rating_before": round(rating_before[pid], 1), "rating_after": round(p["rating"], 1),
@@ -730,7 +787,7 @@ class League:
             "episodes": 0, "rating": START_RATING, "last_delta": 0.0, "pb": None,
             "wins": 0, "podiums": 0, "races": 0, "finishes": 0, "form": [],
             "joined_gp": self.gp, "beat_legend": False,
-            "gen": 0, "parent": None, "parent_pid": None, "origin": "initial",
+            "gen": 0, "parent": None, "parent_pid": None, "origin": "initial", "family": pid,
         }
 
     def archive(self, p: dict, reason: str, gp: int) -> None:
@@ -750,7 +807,7 @@ class League:
         return {**{k: p[k] for k in ("name", "nation", "number", "color", "legend", "joined_gp")},
                 "titles": p.get("titles", 0), "peak": round(p.get("peak", p["rating"]), 1),
                 "gen": p.get("gen", 0), "parent": p.get("parent"), "origin": p.get("origin"),
-                "lineage": p.get("lineage", []), "n_kc": int(p["brain"].n_kc)}
+                "lineage": p.get("lineage", []), "n_kc": int(p["brain"].n_kc), "family": p.get("family", p["id"])}
 
     def apply_field_settings(self):
         """Bring the roster in line with the current settings (round boundary only)."""
@@ -1089,6 +1146,10 @@ class League:
                 done_pids.append(pid)
                 self.write_live("training", len(done_pids), len(trained), done_pids, gp)
 
+        for p in trained:
+            p["sig"] = self.goal.known(p["brain"])                           # what the elite check is keyed on
+        self.elite_check(pool, gp)
+
         # classification: finishers by time, everyone else by distance covered
         def key(pid):
             r = raced[pid]["result"]
@@ -1257,7 +1318,7 @@ class League:
             eligible = [p for p in self.trained() if gp - p["joined_gp"] + 1 >= self.cfg["min_age"]]
             if not eligible or len(self.trained()) < 2:
                 break
-            worst = max(eligible, key=lambda p: (p.get("fit") if p.get("fit") is not None else 99.0, -p["rating"]))
+            worst = self.pick_retiree(eligible)
             self.archive(worst, "retired", gp)
             del self.pilots[worst["id"]]
             self.history.pop(worst["id"], None)
