@@ -149,7 +149,8 @@ SETTINGS_SPEC = [
     dict(key="elite_check", group="Evolution", label="Elite check (episodes per scenario)", type="int", min=0, max=12, default=6,
          apply="round", help="The best flies are re-tested on a larger fixed set of episodes (re-run only when the brain changes), "
                              "so a difference of 0.02 s is not just noise. Used to pick parents and retirees. 0 = off."),
-    dict(key="elite_count", group="Evolution", label="Flies in the elite check", type="int", min=1, max=8, default=4, apply="round"),
+    dict(key="elite_count", group="Evolution", label="Flies in the elite check", type="int", min=1, max=8, default=4, apply="round",
+         help="How many of the best flies (by the per-round check) get the elite check."),
     dict(key="eval_per_scenario", group="Evolution", label="Check episodes per scenario", type="int", min=0, max=6, default=2,
          apply="round", help="After each training block a fly is tested on this many frozen episodes in each of the five scenarios; "
                              "the block is kept only if the fly did not get worse. 0 = no check (blocks always kept)."),
@@ -1435,10 +1436,10 @@ def build_parser() -> argparse.ArgumentParser:
     for s in SETTINGS_SPEC:
         flag = "--" + s["key"].replace("_", "-")
         if s["type"] == "bool":
-            ap.add_argument(flag, action=argparse.BooleanOptionalAction, default=None, help=s["help"])
+            ap.add_argument(flag, action=argparse.BooleanOptionalAction, default=None, help=s["help"].replace("%", "%%"))
         else:
             ap.add_argument(flag, type={"int": int, "float": float, "text": str}[s["type"]], default=None,
-                            help=f"{s['help']} (default {s['default']})")
+                            help=f"{s['help']} (default {s['default']})".replace("%", "%%"))       # argparse treats a bare % in help as a format code
     ap.add_argument("--legend-path", default=str(LEGEND_PATH))
     ap.add_argument("--fresh", action="store_true", help="discard saved league state and start over")
     ap.add_argument("--host", default="127.0.0.1")
